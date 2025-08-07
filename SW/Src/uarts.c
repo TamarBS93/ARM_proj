@@ -62,12 +62,11 @@ result_pro_t uart_testing(test_command_t* command){
 	        printf("RX DMA timeout\n");
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
-	        HAL_UART_DMAStop(UART_RECEIVER); // CRITICAL: Stop the stuck receive
+	        HAL_UART_DMAStop(UART_RECEIVER); //Stop the stuck receive
 	        return response;
 	    }
 
 	    // --- 4. COMPARE SENT vs. RECEIVED data ---
-	    // ... your comparison code ...
 	    int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
 	    if (comp != 0) {
 	        printf("Data mismatch on iteration %u.\n", i + 1);

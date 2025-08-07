@@ -38,6 +38,9 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+ip_addr_t server_addr;
+u16_t server_port;
+//struct udp_pcb *server_pcb;
 
 /* USER CODE END PTD */
 
@@ -136,7 +139,7 @@ static struct udp_pcb *udp_pcb_handle;
 void udp_receive_init(void);
 void udp_receive_callback(void *arg, struct udp_pcb *pcb,
                           struct pbuf *p, const ip_addr_t *addr, u16_t port);
-void simple_uart_loopback_test(void);
+void send_response(result_pro_t result);
 
 #define UART_SENDER 		(&huart2)
 #define UART_RECEIVER 		(&huart4)
@@ -144,38 +147,7 @@ void simple_uart_loopback_test(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-// Place this code in a function called by main(), before osKernelStart()
-void simple_uart_loopback_test(void) {
-    uint8_t tx_buffer[] = "Test!";
-    uint8_t rx_buffer[10] = {0};
-    uint16_t tx_len = sizeof(tx_buffer) - 1; // Subtract 1 for the null terminator
 
-    printf("Starting simple blocking UART loopback test...\n");
-    //HAL_Delay(100);
-
-    // --- Step 1: Transmit data using a blocking call ---
-    if (HAL_UART_Transmit(UART_SENDER, tx_buffer, tx_len, 500) != HAL_OK) {
-        printf("UART Transmit failed!\n");
-        return;
-    }
-    printf("Successfully transmitted: %s\n", tx_buffer);
-
-    // --- Step 2: Receive data using a blocking call ---
-    // The UART6_RX and UART2_TX pins MUST be physically connected for this to work.
-    if (HAL_UART_Receive(UART_RECEIVER, rx_buffer, tx_len, 500) != HAL_OK) {
-        printf("UART Receive failed or timed out!\n");
-        return;
-    }
-
-    // --- Step 3: Compare the data ---
-    if (memcmp(tx_buffer, rx_buffer, tx_len) == 0) {
-        printf("SUCCESS: Data matched!\n");
-    } else {
-        printf("FAILURE: Data mismatch!\n");
-        printf("Sent: %s\n", tx_buffer);
-        printf("Received: %s\n", rx_buffer);
-    }
-}
 /* USER CODE END 0 */
 
 /**
@@ -694,6 +666,11 @@ void udp_receive_init(void)
 void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
     if (p != NULL) {
+        // Copy the sender's IP address
+        ip_addr_copy(server_addr, *addr);
+        // Copy the sender's port
+        server_port = port;
+
         printf("Received from %s:%d -> %.*s\n",
                ipaddr_ntoa(addr), port, p->len, (char *)p->payload);
 
@@ -727,6 +704,24 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
             printf("Packet too short: %d bytes\n", p->len);
         }
         pbuf_free(p);
+    }
+}
+
+void send_response(result_pro_t result) {
+    // Check if we have a valid sender address
+    if (ip_addr_isany(&server_addr) == 0) {
+        // Create a new pbuf for the response data
+        struct pbuf* p = pbuf_alloc(PBUF_TRANSPORT, sizeof(result_pro_t), PBUF_RAM);
+        if (p != NULL) {
+            // Copy the result struct into the pbuf payload
+            memcpy(p->payload, &result, sizeof(result_pro_t));
+
+            // Send the response to the stored address and port
+            udp_sendto(udp_pcb_handle, p, &server_addr, server_port);
+
+            // Free the pbuf
+            pbuf_free(p);
+        }
     }
 }
 
@@ -833,11 +828,12 @@ void perform_tests(void *argument)
 //		response.test_result = TEST_ERR;
 		// send response
 	}
+	result_pro_t response_result;
 	switch (cmd->peripheral){
 	case TIMER:
 		break;
 	case UART:
-		uart_testing(cmd);
+		send_response(uart_testing(cmd));
 		break;
 	case SPI:
 		break;

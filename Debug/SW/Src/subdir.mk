@@ -5,12 +5,15 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../SW/Src/my_main.c \
 ../SW/Src/uarts.c 
 
 OBJS += \
+./SW/Src/my_main.o \
 ./SW/Src/uarts.o 
 
 C_DEPS += \
+./SW/Src/my_main.d \
 ./SW/Src/uarts.d 
 
 
@@ -21,7 +24,7 @@ SW/Src/%.o SW/Src/%.su SW/Src/%.cyclo: ../SW/Src/%.c SW/Src/subdir.mk
 clean: clean-SW-2f-Src
 
 clean-SW-2f-Src:
-	-$(RM) ./SW/Src/uarts.cyclo ./SW/Src/uarts.d ./SW/Src/uarts.o ./SW/Src/uarts.su
+	-$(RM) ./SW/Src/my_main.cyclo ./SW/Src/my_main.d ./SW/Src/my_main.o ./SW/Src/my_main.su ./SW/Src/uarts.cyclo ./SW/Src/uarts.d ./SW/Src/uarts.o ./SW/Src/uarts.su
 
 .PHONY: clean-SW-2f-Src
 
