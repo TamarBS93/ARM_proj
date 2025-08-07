@@ -3,7 +3,7 @@
 #define TIMEOUT 	1000 	// ticks (30  millis).
 
 #define UART_SENDER 		(&huart2)
-#define UART_RECEIVER 		(&huart6)
+#define UART_RECEIVER 		(&huart4)
 
 result_pro_t uart_testing(test_command_t* command){
 
@@ -12,7 +12,7 @@ result_pro_t uart_testing(test_command_t* command){
 	uint8_t rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 
 	result_pro_t response;
-	HAL_StatusTypeDef status;
+	HAL_StatusTypeDef rx_status, tx_status;
 
 	if (command == NULL) {
         printf("UART_TEST: Received NULL command pointer. Skipping.\n");
@@ -21,90 +21,63 @@ result_pro_t uart_testing(test_command_t* command){
 	}
 
 	response.test_id = command->test_id;
-
 	// Copy pattern to TX buffer
     memcpy(tx_buffer, command->bit_pattern, command->bit_pattern_length);
 
 	for(uint8_t i=0 ; i< command->iterations ; i++){
-		memset(rx_buffer, 0, sizeof(rx_buffer)); // Clear receive buffer
+	    printf("UART_TEST: Iteration %u/%u --\n", i + 1, command->iterations);
+	    memset(rx_buffer, 0, command->bit_pattern_length);
 
-	    status = HAL_UART_Receive_DMA(UART_RECEIVER, rx_buffer, sizeof(rx_buffer));
-	    if (status != HAL_OK) {
-	        printf("Failed to start receive DMA: %d, error 0x%"PRIX32"\r\n", status, HAL_UART_GetError(UART_RECEIVER));
+	    // --- 1. START RECEIVE DMA FIRST ---
+	    HAL_StatusTypeDef rx_status = HAL_UART_Receive_DMA(UART_RECEIVER, rx_buffer, command->bit_pattern_length);
+	    printf("RX DMA start status: %d\n", rx_status);
+	    if (rx_status != HAL_OK) {
+	        printf("Failed to start receive DMA: %d\n", rx_status);
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
 	        return response;
 	    }
 
-        // --- 1. TRANSMIT a block of data via DMA ---
-		status = HAL_UART_Transmit_DMA(UART_SENDER, tx_buffer, command->bit_pattern_length);
-		if (status != HAL_OK) {
-			printf("Failed to sendIT on UART sender: %d, error 0x%"PRIX32"\r\n", status, HAL_UART_GetError(UART_SENDER));
+	    // --- 2. TRANSMIT a block of data via DMA ---
+	    HAL_StatusTypeDef tx_status = HAL_UART_Transmit_DMA(UART_SENDER, tx_buffer, command->bit_pattern_length);
+	    printf("TX DMA start status: %d\n", tx_status);
+	    if (tx_status != HAL_OK) {
+	        printf("Failed to send DMA on UART sender: %d\n", tx_status);
 	        response.test_result = TEST_FAIL;
+	        vPortFree(command);
+	        HAL_UART_DMAStop(UART_RECEIVER); // Stop the pending receive
 	        return response;
-		}
+	    }
 
-//        // Wait for the TX DMA transfer to complete (semaphore is given in the TxCpltCallback)
-//        // --- Wait for TX to complete
-//        if (xSemaphoreTake(xUartTxSemaphoreHandle, pdMS_TO_TICKS(2000)) != pdPASS) {
-//             printf("TX DMA timeout\n");
-//             response.test_result = TEST_FAIL;
-//             vPortFree(command);
-//             return response;
-//        }
-//        if (xSemaphoreTake(xUartRxSemaphoreHandle, pdMS_TO_TICKS(2000)) != pdPASS) { // 2 second timeout
-//            printf("RX DMA timeout\n");
-//            response.test_result = TEST_FAIL;
-//            vPortFree(command);
-//            return response;
-////            // --- 2. RECEIVE the block of data via DMA ---
-////    		status = HAL_UART_Receive_DMA(UART_RECEIVER, rx_buffer, command->bit_pattern_length);
-////    		if (status != HAL_OK) {
-////    			printf("Failed to receiveIT on UART receiver: %d, error 0x%"PRIX32"\r\n", status, HAL_UART_GetError(UART_RECEIVER));
-////    	        response.test_result = TEST_FAIL;
-////    	        vPortFree(command);
-////    	        return response;
-////    		}
-//        }
-//        else{
-//			printf("Failed to receive a xUartRxSemaphore Token\n");
-//        }
+	    // --- 3. WAIT FOR BOTH TX AND RX DMA COMPLETION ---
+	    if (xSemaphoreTake(xUartTxSemaphoreHandle, pdMS_TO_TICKS(TIMEOUT)) != pdPASS) {
+	         printf("TX DMA timeout\n");
+	         response.test_result = TEST_FAIL;
+	         vPortFree(command);
+	         HAL_UART_DMAStop(UART_RECEIVER); // Stop the pending receive
+	         return response;
+	    }
 
-        // --- 3. COMPARE SENT vs. RECEIVED data ---
-        if (command->bit_pattern_length > 100) {
-        	printf("bit_pattern_length more than 100");
+	    if (xSemaphoreTake(xUartRxSemaphoreHandle, pdMS_TO_TICKS(TIMEOUT)) != pdPASS) {
+	        printf("RX DMA timeout\n");
+	        response.test_result = TEST_FAIL;
+	        vPortFree(command);
+	        HAL_UART_DMAStop(UART_RECEIVER); // CRITICAL: Stop the stuck receive
+	        return response;
+	    }
 
-//            // Use CRC comparison for large data
-//            uint32_t sent_crc = calculate_crc32(tx_buffer, command->bit_pattern_length);
-//            uint32_t received_crc = calculate_crc32(rx_buffer, command->bit_pattern_length);
-//            if (sent_crc == received_crc) {
-//                response.test_result = PASS;
-//                return response;
-//            } else {
-//                printf("UART_TEST: CRC mismatch on iteration %u. Sent CRC: 0x%lX, Received CRC: 0x%lX\n",
-//                       i + 1, sent_crc, received_crc);
-//                response.test_result = FAIL;
-//                return response;            }
-        } else {
-            // Use memcmp for smaller data
-        	int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
-            if (comp != 0)
-            {
-            	printf("memcmp result: %d\n", comp);
-
-                printf("UART_TEST: Data mismatch on iteration %u.\n", i + 1);
-                // debug print mismatch details for small data
-                printf("Sent: %.*s\n", command->bit_pattern_length, tx_buffer);
-                printf("Recv: %.*s\n", command->bit_pattern_length, rx_buffer);
-
-                response.test_result = TEST_FAIL;
-                vPortFree(command);
-                return response;
-            }
-            else{
-                printf("UART_TEST: Data Match on iteration %u.\n", i + 1);
-            }
-        }
+	    // --- 4. COMPARE SENT vs. RECEIVED data ---
+	    // ... your comparison code ...
+	    int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
+	    if (comp != 0) {
+	        printf("Data mismatch on iteration %u.\n", i + 1);
+	        printf("Sent: %.*s\n", command->bit_pattern_length, tx_buffer);
+	        printf("Recv: %.*s\n", command->bit_pattern_length, rx_buffer);
+	        response.test_result = TEST_FAIL;
+	        vPortFree(command);
+	        return response;
+	    }
+	    printf("Data Match on iteration %u.\n", i + 1);
 
         osDelay(10); // Small delay between iterations to prevent overwhelming the UUT or the system
 	}

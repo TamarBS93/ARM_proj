@@ -57,9 +57,11 @@ extern struct netif gnetif;
 
 I2C_HandleTypeDef hi2c1;
 
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
+DMA_HandleTypeDef hdma_uart4_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 DMA_HandleTypeDef hdma_usart6_rx;
 
@@ -120,6 +122,7 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART6_UART_Init(void);
+static void MX_UART4_Init(void);
 void lwip_initiation(void *argument);
 void blinking_blue(void *argument);
 void udp_function(void *argument);
@@ -133,12 +136,46 @@ static struct udp_pcb *udp_pcb_handle;
 void udp_receive_init(void);
 void udp_receive_callback(void *arg, struct udp_pcb *pcb,
                           struct pbuf *p, const ip_addr_t *addr, u16_t port);
+void simple_uart_loopback_test(void);
 
+#define UART_SENDER 		(&huart2)
+#define UART_RECEIVER 		(&huart4)
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// Place this code in a function called by main(), before osKernelStart()
+void simple_uart_loopback_test(void) {
+    uint8_t tx_buffer[] = "Test!";
+    uint8_t rx_buffer[10] = {0};
+    uint16_t tx_len = sizeof(tx_buffer) - 1; // Subtract 1 for the null terminator
 
+    printf("Starting simple blocking UART loopback test...\n");
+    //HAL_Delay(100);
+
+    // --- Step 1: Transmit data using a blocking call ---
+    if (HAL_UART_Transmit(UART_SENDER, tx_buffer, tx_len, 500) != HAL_OK) {
+        printf("UART Transmit failed!\n");
+        return;
+    }
+    printf("Successfully transmitted: %s\n", tx_buffer);
+
+    // --- Step 2: Receive data using a blocking call ---
+    // The UART6_RX and UART2_TX pins MUST be physically connected for this to work.
+    if (HAL_UART_Receive(UART_RECEIVER, rx_buffer, tx_len, 500) != HAL_OK) {
+        printf("UART Receive failed or timed out!\n");
+        return;
+    }
+
+    // --- Step 3: Compare the data ---
+    if (memcmp(tx_buffer, rx_buffer, tx_len) == 0) {
+        printf("SUCCESS: Data matched!\n");
+    } else {
+        printf("FAILURE: Data mismatch!\n");
+        printf("Sent: %s\n", tx_buffer);
+        printf("Received: %s\n", rx_buffer);
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -176,9 +213,9 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_USART2_UART_Init();
   MX_USART6_UART_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
   // ethernetif_init(&gnetif);
-
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -350,6 +387,41 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -500,11 +572,14 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA1_Stream6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
   /* DMA2_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 
 }
@@ -746,7 +821,7 @@ void perform_tests(void *argument)
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // waiting for a notification
-	printf("perform_tests woke up!\n");
+	//printf("perform_tests woke up!\n");
 
 	if (xQueueReceive(testsQHandle, &cmd, 0) != pdPASS)
 	{
