@@ -1,0 +1,3 @@
+../SW/Src/i2cs.c:8:14:i2c_testing	10
+../SW/Src/i2cs.c:103:6:HAL_I2C_MasterTxCpltCallback	3
+../SW/Src/i2cs.c:116:6:HAL_I2C_SlaveRxCpltCallback	3

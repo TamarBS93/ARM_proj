@@ -1,7 +1,5 @@
 #include "uarts.h"
 
-#define TIMEOUT 	1000 	// ticks (30  millis).
-
 #define UART_SENDER 		(&huart2)
 #define UART_RECEIVER 		(&huart4)
 
@@ -25,12 +23,11 @@ result_pro_t uart_testing(test_command_t* command){
     memcpy(tx_buffer, command->bit_pattern, command->bit_pattern_length);
 
 	for(uint8_t i=0 ; i< command->iterations ; i++){
-	    printf("UART_TEST: Iteration %u/%u --\n", i + 1, command->iterations);
+	    printf("UART_TEST: Iteration %u/%u -\n", i + 1, command->iterations);
 	    memset(rx_buffer, 0, command->bit_pattern_length);
 
-	    // --- 1. START RECEIVE DMA FIRST ---
+	    // --- 1. START RECEIVE DMA ---
 	    HAL_StatusTypeDef rx_status = HAL_UART_Receive_DMA(UART_RECEIVER, rx_buffer, command->bit_pattern_length);
-	    printf("RX DMA start status: %d\n", rx_status);
 	    if (rx_status != HAL_OK) {
 	        printf("Failed to start receive DMA: %d\n", rx_status);
 	        response.test_result = TEST_FAIL;
@@ -40,7 +37,6 @@ result_pro_t uart_testing(test_command_t* command){
 
 	    // --- 2. TRANSMIT a block of data via DMA ---
 	    HAL_StatusTypeDef tx_status = HAL_UART_Transmit_DMA(UART_SENDER, tx_buffer, command->bit_pattern_length);
-	    printf("TX DMA start status: %d\n", tx_status);
 	    if (tx_status != HAL_OK) {
 	        printf("Failed to send DMA on UART sender: %d\n", tx_status);
 	        response.test_result = TEST_FAIL;
@@ -50,16 +46,16 @@ result_pro_t uart_testing(test_command_t* command){
 	    }
 
 	    // --- 3. WAIT FOR BOTH TX AND RX DMA COMPLETION ---
-	    if (xSemaphoreTake(xUartTxSemaphoreHandle, pdMS_TO_TICKS(TIMEOUT)) != pdPASS) {
-	         printf("TX DMA timeout\n");
+	    if (xSemaphoreTake(UartTxHandle, TIMEOUT) != pdPASS) {
+	         printf("fail to get TxSemaphore\n");
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
 	         HAL_UART_DMAStop(UART_RECEIVER); // Stop the pending receive
 	         return response;
 	    }
 
-	    if (xSemaphoreTake(xUartRxSemaphoreHandle, pdMS_TO_TICKS(TIMEOUT)) != pdPASS) {
-	        printf("RX DMA timeout\n");
+	    if (xSemaphoreTake(UartRxHandle, TIMEOUT) != pdPASS) {
+	         printf("fail to get RxSemaphore\n");
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
 	        HAL_UART_DMAStop(UART_RECEIVER); //Stop the stuck receive
@@ -67,14 +63,30 @@ result_pro_t uart_testing(test_command_t* command){
 	    }
 
 	    // --- 4. COMPARE SENT vs. RECEIVED data ---
-	    int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
-	    if (comp != 0) {
-	        printf("Data mismatch on iteration %u.\n", i + 1);
-	        printf("Sent: %.*s\n", command->bit_pattern_length, tx_buffer);
-	        printf("Recv: %.*s\n", command->bit_pattern_length, rx_buffer);
-	        response.test_result = TEST_FAIL;
-	        vPortFree(command);
-	        return response;
+	    if (command->bit_pattern_length > 100) {
+			printf("bit_pattern_length more than 100\n");
+
+			// Use CRC comparison for large data
+			uint32_t sent_crc = calculate_crc(tx_buffer, command->bit_pattern_length);
+			uint32_t received_crc = calculate_crc(rx_buffer, command->bit_pattern_length);
+			if (sent_crc != received_crc) {
+				printf("UART_TEST: CRC mismatch on iteration %u. Sent CRC: 0x%lX, Received CRC: 0x%lX\n",
+					   i + 1, sent_crc, received_crc);
+				response.test_result = TEST_FAIL;
+				vPortFree(command);
+				return response;
+			}
+	    }
+	    else {
+			int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
+			if (comp != 0) {
+				printf("Data mismatch on iteration %u.\n", i + 1);
+				printf("Sent: %.*s\n", command->bit_pattern_length, tx_buffer);
+				printf("Recv: %.*s\n", command->bit_pattern_length, rx_buffer);
+				response.test_result = TEST_FAIL;
+				vPortFree(command);
+				return response;
+			}
 	    }
 	    printf("Data Match on iteration %u.\n", i + 1);
 
@@ -89,11 +101,11 @@ result_pro_t uart_testing(test_command_t* command){
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    printf("TX callback fired\n");
 
     if (huart->Instance == UART_SENDER->Instance) // Check the instance of your sender UART
     {
-        xSemaphoreGiveFromISR(xUartTxSemaphoreHandle, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(UartTxHandle, &xHigherPriorityTaskWoken);
+        printf("TX callback fired and freed the semaphore\n");
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
@@ -102,11 +114,11 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    printf("RX callback fired\n");
 
     if (huart->Instance == UART_RECEIVER->Instance) // Check the instance of your receiver UART
     {
-        xSemaphoreGiveFromISR(xUartRxSemaphoreHandle, &xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(UartRxHandle, &xHigherPriorityTaskWoken);
+        printf("RX callback fired and freed the semaphore\n");
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }

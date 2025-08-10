@@ -32,6 +32,7 @@
 
 #include "project_header.h"
 #include "uarts.h"
+#include "i2cs.h"
 
 
 /* USER CODE END Includes */
@@ -58,15 +59,18 @@ extern struct netif gnetif;
 
 /* Private variables ---------------------------------------------------------*/
 
+CRC_HandleTypeDef hcrc;
+
 I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c4;
+DMA_HandleTypeDef hdma_i2c1_rx;
+DMA_HandleTypeDef hdma_i2c4_tx;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
-UART_HandleTypeDef huart6;
 DMA_HandleTypeDef hdma_uart4_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
-DMA_HandleTypeDef hdma_usart6_rx;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
@@ -103,15 +107,25 @@ osMessageQueueId_t testsQHandle;
 const osMessageQueueAttr_t testsQ_attributes = {
   .name = "testsQ"
 };
-/* Definitions for xUartRxSemaphore */
-osSemaphoreId_t xUartRxSemaphoreHandle;
-const osSemaphoreAttr_t xUartRxSemaphore_attributes = {
-  .name = "xUartRxSemaphore"
+/* Definitions for UartRx */
+osSemaphoreId_t UartRxHandle;
+const osSemaphoreAttr_t UartRx_attributes = {
+  .name = "UartRx"
 };
-/* Definitions for xUartTxSemaphore */
-osSemaphoreId_t xUartTxSemaphoreHandle;
-const osSemaphoreAttr_t xUartTxSemaphore_attributes = {
-  .name = "xUartTxSemaphore"
+/* Definitions for UartTx */
+osSemaphoreId_t UartTxHandle;
+const osSemaphoreAttr_t UartTx_attributes = {
+  .name = "UartTx"
+};
+/* Definitions for I2cRx */
+osSemaphoreId_t I2cRxHandle;
+const osSemaphoreAttr_t I2cRx_attributes = {
+  .name = "I2cRx"
+};
+/* Definitions for I2cTx */
+osSemaphoreId_t I2cTxHandle;
+const osSemaphoreAttr_t I2cTx_attributes = {
+  .name = "I2cTx"
 };
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -124,8 +138,9 @@ static void MX_I2C1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_USART6_UART_Init(void);
 static void MX_UART4_Init(void);
+static void MX_CRC_Init(void);
+static void MX_I2C4_Init(void);
 void lwip_initiation(void *argument);
 void blinking_blue(void *argument);
 void udp_function(void *argument);
@@ -140,6 +155,7 @@ void udp_receive_init(void);
 void udp_receive_callback(void *arg, struct udp_pcb *pcb,
                           struct pbuf *p, const ip_addr_t *addr, u16_t port);
 void send_response(result_pro_t result);
+uint32_t calculate_crc(uint8_t *data, size_t length);
 
 #define UART_SENDER 		(&huart2)
 #define UART_RECEIVER 		(&huart4)
@@ -184,8 +200,9 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_USART2_UART_Init();
-  MX_USART6_UART_Init();
   MX_UART4_Init();
+  MX_CRC_Init();
+  MX_I2C4_Init();
   /* USER CODE BEGIN 2 */
   // ethernetif_init(&gnetif);
   /* USER CODE END 2 */
@@ -199,17 +216,20 @@ int main(void)
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
-  /* creation of xUartRxSemaphore */
-  xUartRxSemaphoreHandle = osSemaphoreNew(1, 1, &xUartRxSemaphore_attributes);
+  /* creation of UartRx */
+  UartRxHandle = osSemaphoreNew(1, 0, &UartRx_attributes);
 
-  /* creation of xUartTxSemaphore */
-  xUartTxSemaphoreHandle = osSemaphoreNew(1, 1, &xUartTxSemaphore_attributes);
+  /* creation of UartTx */
+  UartTxHandle = osSemaphoreNew(1, 0, &UartTx_attributes);
+
+  /* creation of I2cRx */
+  I2cRxHandle = osSemaphoreNew(1, 0, &I2cRx_attributes);
+
+  /* creation of I2cTx */
+  I2cTxHandle = osSemaphoreNew(1, 0, &I2cTx_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 
-  if (xUartTxSemaphoreHandle == NULL || xUartRxSemaphoreHandle == NULL){
-	  printf("Failed to create semaphores!\n");
-  }
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -311,6 +331,37 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void)
+{
+
+  /* USER CODE BEGIN CRC_Init 0 */
+
+  /* USER CODE END CRC_Init 0 */
+
+  /* USER CODE BEGIN CRC_Init 1 */
+
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  hcrc.Init.DefaultPolynomialUse = DEFAULT_POLYNOMIAL_ENABLE;
+  hcrc.Init.DefaultInitValueUse = DEFAULT_INIT_VALUE_ENABLE;
+  hcrc.Init.InputDataInversionMode = CRC_INPUTDATA_INVERSION_NONE;
+  hcrc.Init.OutputDataInversionMode = CRC_OUTPUTDATA_INVERSION_DISABLE;
+  hcrc.InputDataFormat = CRC_INPUTDATA_FORMAT_BYTES;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CRC_Init 2 */
+
+  /* USER CODE END CRC_Init 2 */
+
+}
+
+/**
   * @brief I2C1 Initialization Function
   * @param None
   * @retval None
@@ -327,7 +378,7 @@ static void MX_I2C1_Init(void)
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
   hi2c1.Init.Timing = 0x00808CD2;
-  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.OwnAddress1 = 120;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
@@ -355,6 +406,54 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief I2C4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C4_Init(void)
+{
+
+  /* USER CODE BEGIN I2C4_Init 0 */
+
+  /* USER CODE END I2C4_Init 0 */
+
+  /* USER CODE BEGIN I2C4_Init 1 */
+
+  /* USER CODE END I2C4_Init 1 */
+  hi2c4.Instance = I2C4;
+  hi2c4.Init.Timing = 0x00808CD2;
+  hi2c4.Init.OwnAddress1 = 0;
+  hi2c4.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c4.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c4.Init.OwnAddress2 = 0;
+  hi2c4.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c4.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c4.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c4, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c4, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C4_Init 2 */
+
+  /* USER CODE END I2C4_Init 2 */
 
 }
 
@@ -464,41 +563,6 @@ static void MX_USART3_UART_Init(void)
 }
 
 /**
-  * @brief USART6 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART6_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART6_Init 0 */
-
-  /* USER CODE END USART6_Init 0 */
-
-  /* USER CODE BEGIN USART6_Init 1 */
-
-  /* USER CODE END USART6_Init 1 */
-  huart6.Instance = USART6;
-  huart6.Init.BaudRate = 115200;
-  huart6.Init.WordLength = UART_WORDLENGTH_8B;
-  huart6.Init.StopBits = UART_STOPBITS_1;
-  huart6.Init.Parity = UART_PARITY_NONE;
-  huart6.Init.Mode = UART_MODE_TX_RX;
-  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart6.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart6.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart6) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART6_Init 2 */
-
-  /* USER CODE END USART6_Init 2 */
-
-}
-
-/**
   * @brief USB_OTG_FS Initialization Function
   * @param None
   * @retval None
@@ -541,18 +605,20 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
-  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
   /* DMA1_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA1_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-  /* DMA2_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 6, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 
 }
 
@@ -573,6 +639,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
@@ -717,12 +784,21 @@ void send_response(result_pro_t result) {
             memcpy(p->payload, &result, sizeof(result_pro_t));
 
             // Send the response to the stored address and port
-            udp_sendto(udp_pcb_handle, p, &server_addr, server_port);
+            if(udp_sendto(udp_pcb_handle, p, &server_addr, server_port) != ERR_OK){
+            	printf("sendto server failed");
+            }
 
             // Free the pbuf
             pbuf_free(p);
         }
     }
+}
+
+
+uint32_t calculate_crc(uint8_t *data, size_t length) {
+    // HAL_CRC_Calculate expects 32-bit words, so convert length
+    uint32_t word_count = (length + 3) / 4; // Round up
+    return HAL_CRC_Calculate(&hcrc, (uint32_t *)data, word_count);
 }
 
 /* USER CODE END 4 */
@@ -838,6 +914,7 @@ void perform_tests(void *argument)
 	case SPI:
 		break;
 	case I2C:
+		send_response(i2c_testing(cmd));
 		break;
 	case ADC_P:
 		break;
