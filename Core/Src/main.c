@@ -33,7 +33,7 @@
 #include "project_header.h"
 #include "uarts.h"
 #include "i2cs.h"
-
+#include "spis.h"
 
 /* USER CODE END Includes */
 
@@ -65,6 +65,9 @@ I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c4;
 DMA_HandleTypeDef hdma_i2c1_rx;
 DMA_HandleTypeDef hdma_i2c4_tx;
+
+SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi2;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
@@ -127,6 +130,16 @@ osSemaphoreId_t I2cTxHandle;
 const osSemaphoreAttr_t I2cTx_attributes = {
   .name = "I2cTx"
 };
+/* Definitions for SpiTx */
+osSemaphoreId_t SpiTxHandle;
+const osSemaphoreAttr_t SpiTx_attributes = {
+  .name = "SpiTx"
+};
+/* Definitions for SpiRx */
+osSemaphoreId_t SpiRxHandle;
+const osSemaphoreAttr_t SpiRx_attributes = {
+  .name = "SpiRx"
+};
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
 
@@ -141,6 +154,8 @@ static void MX_USART2_UART_Init(void);
 static void MX_UART4_Init(void);
 static void MX_CRC_Init(void);
 static void MX_I2C4_Init(void);
+static void MX_SPI1_Init(void);
+static void MX_SPI2_Init(void);
 void lwip_initiation(void *argument);
 void blinking_blue(void *argument);
 void udp_function(void *argument);
@@ -203,8 +218,9 @@ int main(void)
   MX_UART4_Init();
   MX_CRC_Init();
   MX_I2C4_Init();
+  MX_SPI1_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-  // ethernetif_init(&gnetif);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -227,6 +243,12 @@ int main(void)
 
   /* creation of I2cTx */
   I2cTxHandle = osSemaphoreNew(1, 0, &I2cTx_attributes);
+
+  /* creation of SpiTx */
+  SpiTxHandle = osSemaphoreNew(1, 0, &SpiTx_attributes);
+
+  /* creation of SpiRx */
+  SpiRxHandle = osSemaphoreNew(1, 0, &SpiRx_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 
@@ -454,6 +476,85 @@ static void MX_I2C4_Init(void)
   /* USER CODE BEGIN I2C4_Init 2 */
 
   /* USER CODE END I2C4_Init 2 */
+
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 7;
+  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_SLAVE;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 7;
+  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
 
 }
 
@@ -912,6 +1013,7 @@ void perform_tests(void *argument)
 		send_response(uart_testing(cmd));
 		break;
 	case SPI:
+		send_response(spi_testing(cmd));
 		break;
 	case I2C:
 		send_response(i2c_testing(cmd));

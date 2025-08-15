@@ -41,8 +41,8 @@ result_pro_t i2c_testing(test_command_t* command){
 	        printf("Failed to send DMA on I2C sender: %d\n", tx_status);
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
-	        //HAL_I2C_Master_Abort_DMA(I2C_SENDER, I2C_SLAVE_ADDR); // Abort Master transfer on error
-	        //HAL_I2C_Slave_Abort_DMA(I2C_RECEIVER); // Abort Slave transfer on error
+	        i2c_reset(I2C_SENDER); // Reset the Master on error
+	        i2c_reset(I2C_RECEIVER); // Reset the Slave as a precaution
 	        return response;
 	    }
 
@@ -51,8 +51,8 @@ result_pro_t i2c_testing(test_command_t* command){
 	         printf("Master TX timeout\n");
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
-	         //HAL_I2C_Master_Abort_DMA(I2C_SENDER,I2C_SLAVE_ADDR); // Abort Master transfer on timeout
-	         //HAL_I2C_Slave_Abort_DMA(I2C_RECEIVER); // Abort Slave transfer on timeout
+	         i2c_reset(I2C_SENDER); // Reset the Master on timeout
+	         i2c_reset(I2C_RECEIVER); // Reset the Slave as a precaution
 	         return response;
 	    }
 
@@ -60,8 +60,7 @@ result_pro_t i2c_testing(test_command_t* command){
 	         printf("Slave RX timeout\n");
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
-	         //HAL_I2C_Slave_Abort_DMA(I2C_RECEIVER); // CRITICAL: Stop the stuck slave receive
-	         return response;
+	         i2c_reset(I2C_RECEIVER); // Reset the Slave as a precaution	         return response;
 	    }
 
 	    // --- 4. COMPARE SENT vs. RECEIVED data ---
@@ -117,3 +116,16 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
+
+// Create a function to reset the I2C peripheral
+void i2c_reset(I2C_HandleTypeDef *hi2c) {
+    if (HAL_I2C_DeInit(hi2c) != HAL_OK) {
+        // Log a fatal error, the peripheral is in an unrecoverable state
+        printf("Failed to de-initialize I2C peripheral!\n");
+    }
+    if (HAL_I2C_Init(hi2c) != HAL_OK) {
+        // Log a fatal error
+        printf("Failed to re-initialize I2C peripheral!\n");
+    }
+}
+

@@ -28,6 +28,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c_ex.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr_ex.h \
+ ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi.h \
+ ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi_ex.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_tim.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_tim_ex.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart.h \
@@ -97,7 +99,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/errno.h \
  D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/uarts.h \
  D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/project_header.h \
- D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/i2cs.h
+ D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/i2cs.h \
+ D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/spis.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h:
 ../Core/Inc/stm32f7xx_hal_conf.h:
@@ -128,6 +131,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c_ex.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr_ex.h:
+../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi.h:
+../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi_ex.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_tim.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_tim_ex.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart.h:
@@ -198,3 +203,4 @@ D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/project_header.h:
 D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/uarts.h:
 D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/project_header.h:
 D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/i2cs.h:
+D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/spis.h:
