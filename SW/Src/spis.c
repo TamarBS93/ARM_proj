@@ -21,7 +21,7 @@ result_pro_t spi_testing(test_command_t* command){
 	HAL_StatusTypeDef rx_status, tx_status;
 
 	if (command == NULL) {
-        printf("SPI_TEST: Received NULL command pointer. Skipping.\n");
+        printf("SPI_TEST: Received NULL command pointer. Skipping.\n\r");
         response.test_result = TEST_ERR;
         return response;
 	}
@@ -31,14 +31,14 @@ result_pro_t spi_testing(test_command_t* command){
     memcpy(tx_buffer, command->bit_pattern, command->bit_pattern_length);
 
 	for(uint8_t i=0 ; i< command->iterations ; i++){
-	    printf("SPI_TEST: Iteration %u/%u -\n", i + 1, command->iterations);
+	    printf("SPI_TEST: Iteration %u/%u -\n\r", i + 1, command->iterations);
 	    memset(rx_buffer, 0, command->bit_pattern_length);
 
 	    // --- 1. START RECEIVE DMA FIRST (SLAVE) ---
 		//SPI_RECEIVER->Instance->CR1 |= SPI_CR1_SSI; // turn OFF
 	    rx_status = HAL_SPI_Receive_IT(SPI_RECEIVER, rx_buffer, command->bit_pattern_length);
 	    if (rx_status != HAL_OK) {
-	        printf("Failed to start slave receive DMA: %d\n", rx_status);
+	        printf("Failed to start slave receive DMA: %d\n\r", rx_status);
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
 	        return response;
@@ -49,7 +49,7 @@ result_pro_t spi_testing(test_command_t* command){
 
 	    tx_status = HAL_SPI_Transmit(SPI_SENDER, tx_buffer, command->bit_pattern_length,TIMEOUT);
 	    if (tx_status != HAL_OK) {
-	        printf("Failed to send DMA on SPI sender: %d\n", tx_status);
+	        printf("Failed to send DMA on SPI sender: %d\n\r", tx_status);
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
 	        HAL_SPI_Abort_IT(SPI_SENDER); // Stop the stuck sending
@@ -61,7 +61,7 @@ result_pro_t spi_testing(test_command_t* command){
 
 	    // --- 3. WAIT FOR BOTH TX AND RX DMA COMPLETION ---
 //	    if (xSemaphoreTake(SpiTxHandle, TIMEOUT) != pdPASS) {
-//	         printf("Master TX timeout\n");
+//	         printf("Master TX timeout\n\r");
 //	         response.test_result = TEST_FAIL;
 //	         vPortFree(command);
 //	         HAL_SPI_Abort_IT(SPI_SENDER); // Stop the stuck sending
@@ -71,7 +71,7 @@ result_pro_t spi_testing(test_command_t* command){
 //	    }
 
 	    if (xSemaphoreTake(SpiRxHandle, TIMEOUT) != pdPASS) {
-	         printf("Slave RX timeout\n");
+	         printf("Slave RX timeout\n\r");
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
 	         HAL_SPI_Abort_IT(SPI_RECEIVER);
@@ -87,7 +87,7 @@ result_pro_t spi_testing(test_command_t* command){
 	        uint32_t sent_crc = calculate_crc(tx_buffer, command->bit_pattern_length);
 	        uint32_t received_crc = calculate_crc(rx_buffer, command->bit_pattern_length);
 	        if (sent_crc != received_crc) {
-	            printf("SPI_TEST: CRC mismatch on iteration %u.\n", i + 1);
+	            printf("SPI_TEST: CRC mismatch on iteration %u.\n\r", i + 1);
 	            response.test_result = TEST_FAIL;
 	            vPortFree(command);
 	            return response;
@@ -95,13 +95,13 @@ result_pro_t spi_testing(test_command_t* command){
 	    } else {
 	        int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
 	        if (comp != 0) {
-	            printf("Data mismatch on iteration %u.\n", i + 1);
+	            printf("Data mismatch on iteration %u.\n\r", i + 1);
 	            response.test_result = TEST_FAIL;
 	            vPortFree(command);
 	            return response;
 	        }
 	    }
-	    printf("Data Match on iteration %u.\n", i + 1);
+	    printf("Data Match on iteration %u.\n\r", i + 1);
 
         osDelay(10);
 	}
@@ -115,23 +115,18 @@ result_pro_t spi_testing(test_command_t* command){
 //    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 //    if (hspi->Instance == SPI_SENDER->Instance) {
 //        xSemaphoreGiveFromISR(SpiTxHandle, &xHigherPriorityTaskWoken);
-//        printf("Master Tx callback fired and gave a semaphore\n");
+//        printf("Master Tx callback fired and gave a semaphore\n\r");
 //		SPI_RECEIVER->Instance->CR1 |= SPI_CR1_SSI; // turn OFF
 //    }
 //    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 //}
 
-// Correct callback for the Slave Receive
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if (hspi->Instance == SPI_RECEIVER->Instance) {
         xSemaphoreGiveFromISR(SpiRxHandle, &xHigherPriorityTaskWoken);
-        printf("Slave Rx callback fired and gave a semaphore\n");
+        printf("Slave Rx callback fired and gave a semaphore\n\r");
     }
-//    if (hspi->Instance == SPI_SENDER->Instance) {
-//        xSemaphoreGiveFromISR(SpiTxHandle, &xHigherPriorityTaskWoken);
-//        printf("Master TxRx callback fired\n");
-//    }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 

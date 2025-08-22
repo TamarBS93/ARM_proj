@@ -109,7 +109,7 @@ void MX_LWIP_Init(void)
 /* USER CODE END H7_OS_THREAD_NEW_CMSIS_RTOS_V2 */
 
 /* USER CODE BEGIN 3 */
-  printf("IP: %s\n", ipaddr_ntoa(&gnetif.ip_addr));
+  printf("IP: %s\n\r", ipaddr_ntoa(&gnetif.ip_addr));
 /* USER CODE END 3 */
 }
 

@@ -15,7 +15,7 @@
 #define TIMEOUT 	1000 	// ticks (30  millis).
 
 extern UART_HandleTypeDef huart2;
-extern UART_HandleTypeDef huart4;
+extern UART_HandleTypeDef huart5;
 
 extern osSemaphoreId_t UartTxHandle;
 extern osSemaphoreId_t UartRxHandle;

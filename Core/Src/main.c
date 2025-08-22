@@ -34,6 +34,7 @@
 #include "uarts.h"
 #include "i2cs.h"
 #include "spis.h"
+#include "adcs.h"
 
 /* USER CODE END Includes */
 
@@ -58,8 +59,11 @@ extern struct netif gnetif;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
 
 CRC_HandleTypeDef hcrc;
+
+DAC_HandleTypeDef hdac;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c4;
@@ -69,11 +73,9 @@ DMA_HandleTypeDef hdma_i2c4_tx;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 
-UART_HandleTypeDef huart4;
+UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
-DMA_HandleTypeDef hdma_uart4_rx;
-DMA_HandleTypeDef hdma_usart2_tx;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
@@ -140,6 +142,11 @@ osSemaphoreId_t SpiRxHandle;
 const osSemaphoreAttr_t SpiRx_attributes = {
   .name = "SpiRx"
 };
+/* Definitions for AdcSem */
+osSemaphoreId_t AdcSemHandle;
+const osSemaphoreAttr_t AdcSem_attributes = {
+  .name = "AdcSem"
+};
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
 
@@ -151,11 +158,13 @@ static void MX_I2C1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_UART4_Init(void);
 static void MX_CRC_Init(void);
 static void MX_I2C4_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_DAC_Init(void);
+static void MX_UART5_Init(void);
 void lwip_initiation(void *argument);
 void blinking_blue(void *argument);
 void udp_function(void *argument);
@@ -172,8 +181,8 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb,
 void send_response(result_pro_t result);
 uint32_t calculate_crc(uint8_t *data, size_t length);
 
-#define UART_SENDER 		(&huart2)
-#define UART_RECEIVER 		(&huart4)
+//#define UART_SENDER 		(&huart2)
+//#define UART_RECEIVER 		(&huart5)
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -215,11 +224,13 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_USART2_UART_Init();
-  MX_UART4_Init();
   MX_CRC_Init();
   MX_I2C4_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
+  MX_ADC1_Init();
+  MX_DAC_Init();
+  MX_UART5_Init();
   /* USER CODE BEGIN 2 */
   /* USER CODE END 2 */
 
@@ -249,6 +260,9 @@ int main(void)
 
   /* creation of SpiRx */
   SpiRxHandle = osSemaphoreNew(1, 0, &SpiRx_attributes);
+
+  /* creation of AdcSem */
+  AdcSemHandle = osSemaphoreNew(1, 0, &AdcSem_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 
@@ -353,6 +367,58 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_8B;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
   * @brief CRC Initialization Function
   * @param None
   * @retval None
@@ -380,6 +446,46 @@ static void MX_CRC_Init(void)
   /* USER CODE BEGIN CRC_Init 2 */
 
   /* USER CODE END CRC_Init 2 */
+
+}
+
+/**
+  * @brief DAC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_DAC_Init(void)
+{
+
+  /* USER CODE BEGIN DAC_Init 0 */
+
+  /* USER CODE END DAC_Init 0 */
+
+  DAC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN DAC_Init 1 */
+
+  /* USER CODE END DAC_Init 1 */
+
+  /** DAC Initialization
+  */
+  hdac.Instance = DAC;
+  if (HAL_DAC_Init(&hdac) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** DAC channel OUT1 config
+  */
+  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
+  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN DAC_Init 2 */
+
+  /* USER CODE END DAC_Init 2 */
 
 }
 
@@ -559,37 +665,37 @@ static void MX_SPI2_Init(void)
 }
 
 /**
-  * @brief UART4 Initialization Function
+  * @brief UART5 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_UART4_Init(void)
+static void MX_UART5_Init(void)
 {
 
-  /* USER CODE BEGIN UART4_Init 0 */
+  /* USER CODE BEGIN UART5_Init 0 */
 
-  /* USER CODE END UART4_Init 0 */
+  /* USER CODE END UART5_Init 0 */
 
-  /* USER CODE BEGIN UART4_Init 1 */
+  /* USER CODE BEGIN UART5_Init 1 */
 
-  /* USER CODE END UART4_Init 1 */
-  huart4.Instance = UART4;
-  huart4.Init.BaudRate = 115200;
-  huart4.Init.WordLength = UART_WORDLENGTH_8B;
-  huart4.Init.StopBits = UART_STOPBITS_1;
-  huart4.Init.Parity = UART_PARITY_NONE;
-  huart4.Init.Mode = UART_MODE_TX_RX;
-  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart4) != HAL_OK)
+  /* USER CODE END UART5_Init 1 */
+  huart5.Instance = UART5;
+  huart5.Init.BaudRate = 115200;
+  huart5.Init.WordLength = UART_WORDLENGTH_8B;
+  huart5.Init.StopBits = UART_STOPBITS_1;
+  huart5.Init.Parity = UART_PARITY_NONE;
+  huart5.Init.Mode = UART_MODE_TX_RX;
+  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart5.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart5.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart5) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN UART4_Init 2 */
+  /* USER CODE BEGIN UART5_Init 2 */
 
-  /* USER CODE END UART4_Init 2 */
+  /* USER CODE END UART5_Init 2 */
 
 }
 
@@ -711,15 +817,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-  /* DMA1_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 6, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-  /* DMA1_Stream6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 
 }
 
@@ -748,7 +848,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : USER_Btn_Pin */
   GPIO_InitStruct.Pin = USER_Btn_Pin;
@@ -763,12 +863,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : USB_PowerSwitchOn_Pin */
-  GPIO_InitStruct.Pin = USB_PowerSwitchOn_Pin;
+  /*Configure GPIO pin : PG6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(USB_PowerSwitchOn_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_OverCurrent_Pin */
   GPIO_InitStruct.Pin = USB_OverCurrent_Pin;
@@ -798,9 +898,9 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
     // The system is in an unstable state.
     // It is generally not safe to continue execution or call complex functions.
 
-    printf("\n!!! STACK OVERFLOW DETECTED !!!\n");
-    printf("Task: %s\n", pcTaskName);
-    printf("Handle: 0x%lX\n", (uint32_t)xTask);
+    printf("\n\r!!! STACK OVERFLOW DETECTED !!!\n\r");
+    printf("Task: %s\n\r", pcTaskName);
+    printf("Handle: 0x%lX\n\r", (uint32_t)xTask);
 
     // Disable interrupts to prevent further execution and potential damage
     taskDISABLE_INTERRUPTS();
@@ -814,21 +914,21 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
 
 void udp_receive_init(void)
 {
-	//printf("udp_receive_init() called\n");
+	//printf("udp_receive_init() called\n\r");
 
     udp_pcb_handle = udp_new();
     if (!udp_pcb_handle) {
-        printf("Failed to create UDP PCB\n");
+        printf("Failed to create UDP PCB\n\r");
         return;
     }
 
     if (udp_bind(udp_pcb_handle, IP_ADDR_ANY, LOCAL_PORT) != ERR_OK) {
-        printf("UDP bind failed\n");
+        printf("UDP bind failed\n\r");
         return;
     }
 
     udp_recv(udp_pcb_handle, udp_receive_callback, NULL);
-    printf("UDP ready, listening on port %d\n", LOCAL_PORT);
+    printf("UDP ready, listening on port %d\n\r", LOCAL_PORT);
 }
 
 void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
@@ -839,7 +939,7 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
         // Copy the sender's port
         server_port = port;
 
-        printf("Received from %s:%d -> %.*s\n",
+        printf("Received from %s:%d -> %.*s\n\r",
                ipaddr_ntoa(addr), port, p->len, (char *)p->payload);
 
         if (p->len >= sizeof(test_command_t)) {
@@ -848,28 +948,28 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
 			   // Copy the data from the pbuf payload to the allocated memory
 			   memcpy(cmd, p->payload, sizeof(test_command_t)); // Only copy the struct size
 				// Debug print received data
-				printf("Received Test Command:\n");
-				printf("test_id: %lu\n", cmd->test_id);
-				printf("peripheral bitfield: 0x%02X\n", cmd->peripheral);
-				printf("iterations: %u\n", cmd->iterations);
-				printf("bit pattern length: %u\n", cmd->bit_pattern_length);
-				printf("bit pattern: %s\n",cmd->bit_pattern);
+				printf("Received Test Command:\n\r");
+				printf("test_id: %lu\n\r", cmd->test_id);
+				printf("peripheral bitfield: 0x%02X\n\r", cmd->peripheral);
+				printf("iterations: %u\n\r", cmd->iterations);
+				printf("bit pattern length: %u\n\r", cmd->bit_pattern_length);
+				printf("bit pattern: %s\n\r",cmd->bit_pattern);
             }
             else{
-                printf("Failed to allocate memory for test_command_t!\n");
+                printf("Failed to allocate memory for test_command_t!\n\r");
             }
             // Send the POINTER to the newly allocated and copied* data to the queue
             if (xQueueSendToBack(testsQHandle, &cmd, 1) != pdPASS){ // Pass address of pointer
-                printf("Failed to send data to tests queue.\n");
+                printf("Failed to send data to tests queue.\n\r");
                 // If send fails, free the allocated memory immediately
                 vPortFree(cmd);
             } else {
                 // Only notify if successfully sent to queue
-            	//printf("udp_receive_callback sent a command to the tests queue successfully\n");
+            	//printf("udp_receive_callback sent a command to the tests queue successfully\n\r");
                 xTaskNotifyGive(performing_taskHandle);
             }
         } else {
-            printf("Packet too short: %d bytes\n", p->len);
+            printf("Packet too short: %d bytes\n\r", p->len);
         }
         pbuf_free(p);
     }
@@ -993,11 +1093,11 @@ void perform_tests(void *argument)
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // waiting for a notification
-	//printf("perform_tests woke up!\n");
+	//printf("perform_tests woke up!\n\r");
 
 	if (xQueueReceive(testsQHandle, &cmd, 0) != pdPASS)
 	{
-		printf("perform_tests: No test command received\n");
+		printf("perform_tests: No test command received\n\r");
 		continue;
 	}
 	if(cmd->bit_pattern_length > MAX_BIT_PATTERN_LENGTH || cmd->test_id == NULL || cmd->iterations<1){
@@ -1019,6 +1119,7 @@ void perform_tests(void *argument)
 		send_response(i2c_testing(cmd));
 		break;
 	case ADC_P:
+		send_response(adc_testing(cmd));
 		break;
 	default:
 	}
@@ -1076,7 +1177,7 @@ void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+     ex: printf("Wrong parameters value: file %s on line %d\r\n\r", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
