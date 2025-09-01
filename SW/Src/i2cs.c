@@ -22,7 +22,7 @@ result_pro_t i2c_testing(test_command_t* command){
 	HAL_StatusTypeDef rx_status, tx_status;
 
 	if (command == NULL) {
-        printf("I2C_TEST: Received NULL command pointer. Skipping.\n\r");
+//        printf("I2C_TEST: Received NULL command pointer. Skipping.\n\r"); // Debug printf
         response.test_result = TEST_ERR;
         return response;
 	}
@@ -31,13 +31,13 @@ result_pro_t i2c_testing(test_command_t* command){
     memcpy(tx_buffer, command->bit_pattern, command->bit_pattern_length);
 
 	for(uint8_t i=0 ; i< command->iterations ; i++){
-	    printf("I2C_TEST: Iteration %u/%u -\n\r", i + 1, command->iterations);
+//	    printf("I2C_TEST: Iteration %u/%u -\n\r", i + 1, command->iterations); // Debug printf
 	    memset(rx_buffer, 0, command->bit_pattern_length);
 
 	    // --- 1. START RECEIVE DMA FIRST (SLAVE) ---
 	    rx_status = HAL_I2C_Slave_Receive_DMA(I2C_RECEIVER, rx_buffer, command->bit_pattern_length);
 	    if (rx_status != HAL_OK) {
-	        printf("Failed to start slave receive DMA: %d\n\r", rx_status);
+//	        printf("Failed to start slave receive DMA: %d\n\r", rx_status); // Debug printf
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
 	        return response;
@@ -46,7 +46,7 @@ result_pro_t i2c_testing(test_command_t* command){
 	    // --- 2. TRANSMIT a block of data via DMA (MASTER) ---
 	    tx_status = HAL_I2C_Master_Transmit_DMA(I2C_SENDER, I2C_SLAVE_ADDR, tx_buffer, command->bit_pattern_length);
 	    if (tx_status != HAL_OK) {
-	        printf("Failed to send DMA on I2C sender: %d\n\r", tx_status);
+//	        printf("Failed to send DMA on I2C sender: %d\n\r", tx_status); // Debug printf
 	        response.test_result = TEST_FAIL;
 	        vPortFree(command);
 	        i2c_reset(I2C_SENDER); // Reset the Master on error
@@ -56,7 +56,7 @@ result_pro_t i2c_testing(test_command_t* command){
 
 	    // --- 3. WAIT FOR BOTH TX AND RX DMA COMPLETION ---
 	    if (xSemaphoreTake(I2cTxHandle, TIMEOUT) != pdPASS) {
-	         printf("Master TX timeout\n\r");
+//	         printf("Master TX timeout\n\r"); // Debug printf
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
 	         i2c_reset(I2C_SENDER); // Reset the Master on timeout
@@ -65,7 +65,7 @@ result_pro_t i2c_testing(test_command_t* command){
 	    }
 
 	    if (xSemaphoreTake(I2cRxHandle, TIMEOUT) != pdPASS) {
-	         printf("Slave RX timeout\n\r");
+//	         printf("Slave RX timeout\n\r"); // Debug printf
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
 	         i2c_reset(I2C_RECEIVER); // Reset the Slave as a precaution	         return response;
@@ -76,7 +76,7 @@ result_pro_t i2c_testing(test_command_t* command){
 	        uint32_t sent_crc = calculate_crc(tx_buffer, command->bit_pattern_length);
 	        uint32_t received_crc = calculate_crc(rx_buffer, command->bit_pattern_length);
 	        if (sent_crc != received_crc) {
-	            printf("I2C_TEST: CRC mismatch on iteration %u.\n\r", i + 1);
+//	            printf("I2C_TEST: CRC mismatch on iteration %u.\n\r", i + 1); // Debug printf
 	            response.test_result = TEST_FAIL;
 	            vPortFree(command);
 	            return response;
@@ -84,13 +84,13 @@ result_pro_t i2c_testing(test_command_t* command){
 	    } else {
 	        int comp = memcmp(tx_buffer, rx_buffer, command->bit_pattern_length);
 	        if (comp != 0) {
-	            printf("Data mismatch on iteration %u.\n\r", i + 1);
+//	            printf("Data mismatch on iteration %u.\n\r", i + 1); // Debug printf
 	            response.test_result = TEST_FAIL;
 	            vPortFree(command);
 	            return response;
 	        }
 	    }
-	    printf("Data Match on iteration %u.\n\r", i + 1);
+//	    printf("Data Match on iteration %u.\n\r", i + 1); // Debug printf
 
         osDelay(10);
 	}
@@ -107,7 +107,7 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
     if (hi2c->Instance == I2C_SENDER->Instance) // Check the instance of your sender UART
     {
         xSemaphoreGiveFromISR(I2cTxHandle, &xHigherPriorityTaskWoken);
-        printf("TX callback fired and freed the semaphore\n\r");
+//        printf("TX callback fired and freed the semaphore\n\r"); // Debug printf
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
@@ -120,7 +120,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
     if (hi2c->Instance == I2C_RECEIVER->Instance) // Check the instance of your receiver UART
     {
         xSemaphoreGiveFromISR(I2cRxHandle, &xHigherPriorityTaskWoken);
-        printf("RX callback fired and freed the semaphore\n\r");
+//        printf("RX callback fired and freed the semaphore\n\r"); // Debug printf
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -129,11 +129,13 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
 void i2c_reset(I2C_HandleTypeDef *hi2c) {
     if (HAL_I2C_DeInit(hi2c) != HAL_OK) {
         // Log a fatal error, the peripheral is in an unrecoverable state
-        printf("Failed to de-initialize I2C peripheral!\n\r");
+        Error_Handler();
+//        printf("Failed to de-initialize I2C peripheral!\n\r"); // Debug printf
     }
     if (HAL_I2C_Init(hi2c) != HAL_OK) {
         // Log a fatal error
-        printf("Failed to re-initialize I2C peripheral!\n\r");
+        Error_Handler();
+//        printf("Failed to re-initialize I2C peripheral!\n\r"); // Debug printf
     }
 }
 

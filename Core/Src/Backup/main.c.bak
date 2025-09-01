@@ -13,6 +13,7 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
+  *
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -35,14 +36,12 @@
 #include "i2cs.h"
 #include "spis.h"
 #include "adcs.h"
+#include "timer_test.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-ip_addr_t server_addr;
-u16_t server_port;
-//struct udp_pcb *server_pcb;
 
 /* USER CODE END PTD */
 
@@ -73,9 +72,14 @@ DMA_HandleTypeDef hdma_i2c4_tx;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 
-UART_HandleTypeDef huart5;
+TIM_HandleTypeDef htim7;
+
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_uart4_rx;
+DMA_HandleTypeDef hdma_uart4_tx;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
@@ -132,11 +136,6 @@ osSemaphoreId_t I2cTxHandle;
 const osSemaphoreAttr_t I2cTx_attributes = {
   .name = "I2cTx"
 };
-/* Definitions for SpiTx */
-osSemaphoreId_t SpiTxHandle;
-const osSemaphoreAttr_t SpiTx_attributes = {
-  .name = "SpiTx"
-};
 /* Definitions for SpiRx */
 osSemaphoreId_t SpiRxHandle;
 const osSemaphoreAttr_t SpiRx_attributes = {
@@ -146,6 +145,11 @@ const osSemaphoreAttr_t SpiRx_attributes = {
 osSemaphoreId_t AdcSemHandle;
 const osSemaphoreAttr_t AdcSem_attributes = {
   .name = "AdcSem"
+};
+/* Definitions for TimSem */
+osSemaphoreId_t TimSemHandle;
+const osSemaphoreAttr_t TimSem_attributes = {
+  .name = "TimSem"
 };
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -164,15 +168,14 @@ static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_DAC_Init(void);
-static void MX_UART5_Init(void);
+static void MX_TIM7_Init(void);
+static void MX_UART4_Init(void);
 void lwip_initiation(void *argument);
 void blinking_blue(void *argument);
 void udp_function(void *argument);
 void perform_tests(void *argument);
 
 /* USER CODE BEGIN PFP */
-
-// void printf(const char *format, ...);
 
 static struct udp_pcb *udp_pcb_handle;
 void udp_receive_init(void);
@@ -181,12 +184,13 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb,
 void send_response(result_pro_t result);
 uint32_t calculate_crc(uint8_t *data, size_t length);
 
-//#define UART_SENDER 		(&huart2)
-//#define UART_RECEIVER 		(&huart5)
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+ip_addr_t g_server_addr;
+u16_t g_server_port;
 
 /* USER CODE END 0 */
 
@@ -230,7 +234,8 @@ int main(void)
   MX_SPI2_Init();
   MX_ADC1_Init();
   MX_DAC_Init();
-  MX_UART5_Init();
+  MX_TIM7_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
   /* USER CODE END 2 */
 
@@ -255,14 +260,14 @@ int main(void)
   /* creation of I2cTx */
   I2cTxHandle = osSemaphoreNew(1, 0, &I2cTx_attributes);
 
-  /* creation of SpiTx */
-  SpiTxHandle = osSemaphoreNew(1, 0, &SpiTx_attributes);
-
   /* creation of SpiRx */
   SpiRxHandle = osSemaphoreNew(1, 0, &SpiRx_attributes);
 
   /* creation of AdcSem */
   AdcSemHandle = osSemaphoreNew(1, 0, &AdcSem_attributes);
+
+  /* creation of TimSem */
+  TimSemHandle = osSemaphoreNew(1, 0, &TimSem_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 
@@ -388,7 +393,7 @@ static void MX_ADC1_Init(void)
   */
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.Resolution = ADC_RESOLUTION_8B;
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
@@ -405,7 +410,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -665,37 +670,75 @@ static void MX_SPI2_Init(void)
 }
 
 /**
-  * @brief UART5 Initialization Function
+  * @brief TIM7 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_UART5_Init(void)
+static void MX_TIM7_Init(void)
 {
 
-  /* USER CODE BEGIN UART5_Init 0 */
+  /* USER CODE BEGIN TIM7_Init 0 */
 
-  /* USER CODE END UART5_Init 0 */
+  /* USER CODE END TIM7_Init 0 */
 
-  /* USER CODE BEGIN UART5_Init 1 */
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE END UART5_Init 1 */
-  huart5.Instance = UART5;
-  huart5.Init.BaudRate = 115200;
-  huart5.Init.WordLength = UART_WORDLENGTH_8B;
-  huart5.Init.StopBits = UART_STOPBITS_1;
-  huart5.Init.Parity = UART_PARITY_NONE;
-  huart5.Init.Mode = UART_MODE_TX_RX;
-  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart5.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart5.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart5) != HAL_OK)
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 48000 - 1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 100 - 1;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN UART5_Init 2 */
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
 
-  /* USER CODE END UART5_Init 2 */
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
 
 }
 
@@ -817,9 +860,18 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 
 }
 
@@ -875,6 +927,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -935,32 +991,33 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
 {
     if (p != NULL) {
         // Copy the sender's IP address
-        ip_addr_copy(server_addr, *addr);
+        ip_addr_copy(g_server_addr, *addr);
         // Copy the sender's port
-        server_port = port;
+        g_server_port = port;
 
-        printf("Received from %s:%d -> %.*s\n\r",
-               ipaddr_ntoa(addr), port, p->len, (char *)p->payload);
+//        // debug printf
+//        printf("Received from %s:%d -> %.*s\n\r",
+//               ipaddr_ntoa(addr), port, p->len, (char *)p->payload);
 
         if (p->len >= sizeof(test_command_t)) {
             test_command_t *cmd = (test_command_t *)pvPortMalloc(sizeof(test_command_t));
             if (cmd != NULL) {
 			   // Copy the data from the pbuf payload to the allocated memory
 			   memcpy(cmd, p->payload, sizeof(test_command_t)); // Only copy the struct size
-				// Debug print received data
-				printf("Received Test Command:\n\r");
-				printf("test_id: %lu\n\r", cmd->test_id);
-				printf("peripheral bitfield: 0x%02X\n\r", cmd->peripheral);
-				printf("iterations: %u\n\r", cmd->iterations);
-				printf("bit pattern length: %u\n\r", cmd->bit_pattern_length);
-				printf("bit pattern: %s\n\r",cmd->bit_pattern);
+//				// Debug print received data
+//				printf("Received Test Command:\n\r");
+//				printf("test_id: %lu\n\r", cmd->test_id);
+//				printf("peripheral bitfield: 0x%02X\n\r", cmd->peripheral);
+//				printf("iterations: %u\n\r", cmd->iterations);
+//				printf("bit pattern length: %u\n\r", cmd->bit_pattern_length);
+//				printf("bit pattern: %s\n\r",cmd->bit_pattern);
             }
             else{
-                printf("Failed to allocate memory for test_command_t!\n\r");
+                printf("Failed to allocate memory for test_command_t!\n\r"); // Debug printf
             }
             // Send the POINTER to the newly allocated and copied* data to the queue
             if (xQueueSendToBack(testsQHandle, &cmd, 1) != pdPASS){ // Pass address of pointer
-                printf("Failed to send data to tests queue.\n\r");
+                printf("Failed to send data to tests queue.\n\r"); // Debug printf
                 // If send fails, free the allocated memory immediately
                 vPortFree(cmd);
             } else {
@@ -969,7 +1026,7 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
                 xTaskNotifyGive(performing_taskHandle);
             }
         } else {
-            printf("Packet too short: %d bytes\n\r", p->len);
+//            printf("Packet too short: %d bytes\n\r", p->len); // Debug printf
         }
         pbuf_free(p);
     }
@@ -977,7 +1034,7 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
 
 void send_response(result_pro_t result) {
     // Check if we have a valid sender address
-    if (ip_addr_isany(&server_addr) == 0) {
+    if (ip_addr_isany(&g_server_addr) == 0) {
         // Create a new pbuf for the response data
         struct pbuf* p = pbuf_alloc(PBUF_TRANSPORT, sizeof(result_pro_t), PBUF_RAM);
         if (p != NULL) {
@@ -985,8 +1042,8 @@ void send_response(result_pro_t result) {
             memcpy(p->payload, &result, sizeof(result_pro_t));
 
             // Send the response to the stored address and port
-            if(udp_sendto(udp_pcb_handle, p, &server_addr, server_port) != ERR_OK){
-            	printf("sendto server failed");
+            if(udp_sendto(udp_pcb_handle, p, &g_server_addr, g_server_port) != ERR_OK){
+//            	printf("sendto server failed"); // Debug printf
             }
 
             // Free the pbuf
@@ -1050,15 +1107,6 @@ int __io_putchar(int ch)
     HAL_UART_Transmit(&huart3, (uint8_t*)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
-//void printf(const char *format, ...) {
-//    char buffer[256];
-//    va_list args;
-//    va_start(args, format);
-//    vsnprintf(buffer, sizeof(buffer), format, args);
-//    va_end(args);
-//    buffer[sizeof(buffer) - 1] = '\0';
-//    HAL_UART_Transmit(&huart3, (uint8_t *)buffer, strlen(buffer), HAL_MAX_DELAY);
-//}
 /**
 * @brief Function implementing the udp_task thread.
 * @param argument: Not used
@@ -1102,12 +1150,11 @@ void perform_tests(void *argument)
 	}
 	if(cmd->bit_pattern_length > MAX_BIT_PATTERN_LENGTH || cmd->test_id == NULL || cmd->iterations<1){
 		result_pro_t response = {cmd->test_id, TEST_ERR};
-//		response.test_result = TEST_ERR;
-		// send response
+		send_response(response);
 	}
-	result_pro_t response_result;
 	switch (cmd->peripheral){
 	case TIMER:
+		send_response(timer_testing(cmd));
 		break;
 	case UART:
 		send_response(uart_testing(cmd));
@@ -1122,8 +1169,11 @@ void perform_tests(void *argument)
 		send_response(adc_testing(cmd));
 		break;
 	default:
+		result_pro_t response = {cmd->test_id, TEST_ERR};
+		send_response(response);
+        vPortFree(cmd);
+        break;
 	}
-	//vPortFree(cmd); // until i will handle it
     osDelay(1);
   }
   /* USER CODE END perform_tests */
@@ -1147,7 +1197,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
+  if (htim->Instance == TIM7)
+  {
+	    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
+	    // Use the ISR-safe function to give the semaphore
+	    xSemaphoreGiveFromISR(TimSemHandle, &xHigherPriorityTaskWoken);
+
+	    // Call this if a higher priority task was unblocked
+	    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  }
   /* USER CODE END Callback 1 */
 }
 

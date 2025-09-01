@@ -1,2 +1,2 @@
 ../SW/Src/adcs.c:13:14:adc_testing	56	static
-../SW/Src/adcs.c:103:6:HAL_ADC_ConvCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/adcs.c:107:6:HAL_ADC_ConvCpltCallback	24	static,ignoring_inline_asm

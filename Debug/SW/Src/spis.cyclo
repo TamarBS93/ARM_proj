@@ -1,2 +1,2 @@
 ../SW/Src/spis.c:15:14:spi_testing	9
-../SW/Src/spis.c:124:6:HAL_SPI_RxCpltCallback	3
+../SW/Src/spis.c:95:6:HAL_SPI_RxCpltCallback	3

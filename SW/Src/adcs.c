@@ -1,8 +1,8 @@
 #include "adcs.h"
 
 /*
- * ADC                    DAC
- * PA0 (CN10) <---------- PA4 (CN7)
+ * ADC                          DAC
+ * PC0 [IN10] (CN9) <---------- PA4 (CN7)
  */
 
 /*
@@ -20,7 +20,7 @@ result_pro_t adc_testing(test_command_t* command){
 
     // Check for valid command and bit pattern length
 	if (command == NULL) {
-        printf("ADC_TEST: Received NULL command pointer. Skipping.\n\r");
+//        printf("ADC_TEST: Received NULL command pointer. Skipping.\n\r"); // Debug printf
         response.test_result = TEST_ERR;
         return response;
 	}
@@ -31,7 +31,7 @@ result_pro_t adc_testing(test_command_t* command){
 
     status = HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
     if (status != HAL_OK) {
-        printf("Error: Failed to start DAC conversion. Status: %d\n\r", status);
+//        printf("Error: Failed to start DAC conversion. Status: %d\n\r", status); // Debug printf
     	response.test_result = TEST_FAIL;
         vPortFree(command);
         return response;
@@ -39,7 +39,7 @@ result_pro_t adc_testing(test_command_t* command){
 
 	for(uint8_t i=0 ; i< command->iterations ; i++){
 
-		if(command->iterations < command->bit_pattern_length){
+		if(i < command->bit_pattern_length){
 			// Extract the 8-bit expected ADC value from the command's bit pattern
 		    expected_adc_result = command->bit_pattern[i];
 		    // Define a tolerance based on the expected result.
@@ -53,7 +53,7 @@ result_pro_t adc_testing(test_command_t* command){
 	    // Start ADC conversion
 	    status = HAL_ADC_Start_IT(&hadc1);
 	    if (status != HAL_OK) {
-	        printf("Error: Failed to start ADC conversion. Status: %d\n\r", status);
+//	        printf("Error: Failed to start ADC conversion. Status: %d\n\r", status); // Debug printf
 	    	HAL_ADC_Stop(&hadc1);
 	    	response.test_result = TEST_FAIL;
 	        vPortFree(command);
@@ -66,7 +66,7 @@ result_pro_t adc_testing(test_command_t* command){
 		  adc_value = HAL_ADC_GetValue(&hadc1);
 		} // end of ADC conversion
 		else{
-	         printf("ADC semaphore acquire failed or timed out\n\r");
+//	         printf("ADC semaphore acquire failed or timed out\n\r"); // Debug printf
 	         HAL_ADC_Stop(&hadc1);
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
@@ -77,20 +77,22 @@ result_pro_t adc_testing(test_command_t* command){
 		difference = adc_value - expected_adc_result;
 		difference = (difference < 0) ? -difference : difference; //absolute value of the difference
 
-		if (difference <= adc_tolerance) {
-		  printf("ADC value is within tolerance for iteration %u\n\r", i+1);
-		  printf("Expected value=%d >> ADC value =%ld \n\r", expected_adc_result, adc_value);
-		} else {
-		  printf("Test failed on iteration %u- Expected Value: %u, ADC value: %lu.\n\r",i+1, expected_adc_result, adc_value);
-		  HAL_ADC_Stop(&hadc1);
-		  response.test_result = TEST_FAIL;
-		  vPortFree(command);
-		  return response;
+		if (difference > adc_tolerance)
+		{
+//			  printf("Test failed on iteration %u- Expected Value: %u, ADC value: %lu.\n\r",i+1, expected_adc_result, adc_value); // Debug printf
+			  HAL_ADC_Stop(&hadc1);
+			  response.test_result = TEST_FAIL;
+			  vPortFree(command);
+			  return response;
+//		} else {
+//				// Debug printf
+//			  printf("ADC value is within tolerance for iteration %u\n\r", i+1);
+//			  printf("Expected value=%d >> ADC value =%ld \n\r", expected_adc_result, adc_value);
 		}
 		// Stop the ADC conversion
 		status = HAL_ADC_Stop(&hadc1);
 		if (status != HAL_OK) {
-			printf("Warning: Failed to stop ADC conversion. Status: %d\n\r", status);
+//			printf("Warning: Failed to stop ADC conversion. Status: %d\n\r", status); // Debug printf
 	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
 	         return response;
@@ -106,6 +108,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	xSemaphoreGiveFromISR(AdcSemHandle, &xHigherPriorityTaskWoken);
-	printf("ADC complete callback fired and gave a semaphore\n\r");
+//	printf("ADC complete callback fired and gave a semaphore\n\r"); // Debug printf
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }

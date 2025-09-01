@@ -105,7 +105,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/project_header.h \
  D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/i2cs.h \
  D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/spis.h \
- D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/adcs.h
+ D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/adcs.h \
+ D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/timer_test.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h:
 ../Core/Inc/stm32f7xx_hal_conf.h:
@@ -214,3 +215,4 @@ D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/project_header.h:
 D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/i2cs.h:
 D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/spis.h:
 D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/adcs.h:
+D:/Tamar/ARM/projects/Final_Project/LWIP_v2/SW/Inc/timer_test.h:

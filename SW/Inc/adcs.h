@@ -16,7 +16,7 @@ extern DAC_HandleTypeDef hdac;
 
 extern osSemaphoreId_t AdcSemHandle;
 
-#define TOLERANCE_PERCENT 0.05f
+#define TOLERANCE_PERCENT 0.1f
 //#define TOLERANCE_ALLOWED 5
 
 

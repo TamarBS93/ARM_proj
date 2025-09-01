@@ -134,4 +134,5 @@
 "./SW/Src/adcs.o"
 "./SW/Src/i2cs.o"
 "./SW/Src/spis.o"
+"./SW/Src/timer_test.o"
 "./SW/Src/uarts.o"
