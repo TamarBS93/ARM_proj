@@ -20,6 +20,6 @@ extern UART_HandleTypeDef huart4;
 extern osSemaphoreId_t UartTxHandle;
 extern osSemaphoreId_t UartRxHandle;
 
-result_pro_t uart_testing(test_command_t*);
+Result uart_testing(test_command_t*);
 
 #endif /* UARTS_H_ */

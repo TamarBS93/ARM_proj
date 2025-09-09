@@ -48,5 +48,6 @@ typedef struct result_pro_t {
 } result_pro_t;
 #pragma pack()  // Restore default packing
 
+uint32_t calculate_crc(uint8_t *data, size_t length);
 
 #endif

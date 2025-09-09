@@ -1,2 +1,4 @@
-../SW/Src/spis.c:15:14:spi_testing	552	static
-../SW/Src/spis.c:95:6:HAL_SPI_RxCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/spis.c:15:8:spi_testing	32	static
+../SW/Src/spis.c:136:6:HAL_SPI_TxCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/spis.c:156:6:HAL_SPI_RxCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/spis.c:178:6:HAL_SPI_TxRxCpltCallback	24	static,ignoring_inline_asm

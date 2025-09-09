@@ -19,6 +19,7 @@ extern I2C_HandleTypeDef hi2c4;
 extern osSemaphoreId_t I2cTxHandle;
 extern osSemaphoreId_t I2cRxHandle;
 
-result_pro_t i2c_testing(test_command_t*);
+Result i2c_testing(test_command_t*);
+void i2c_reset(I2C_HandleTypeDef *hi2c);
 
 #endif /* I2CS_H_ */

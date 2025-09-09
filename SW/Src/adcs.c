@@ -10,9 +10,7 @@
  * @param command: A pointer to the test_command_t struct.
  * @retval result_t: The result of the test (TEST_PASS or TEST_FAIL).
  */
-result_pro_t adc_testing(test_command_t* command){
-
-	result_pro_t response;
+Result adc_testing(test_command_t* command){
 
 	uint32_t adc_value;
     int32_t difference;
@@ -21,20 +19,16 @@ result_pro_t adc_testing(test_command_t* command){
     // Check for valid command and bit pattern length
 	if (command == NULL) {
 //        printf("ADC_TEST: Received NULL command pointer. Skipping.\n\r"); // Debug printf
-        response.test_result = TEST_ERR;
-        return response;
+        return TEST_ERR;
 	}
-	response.test_id = command->test_id;
-
 	uint32_t expected_adc_result = command->bit_pattern[0];
 	uint32_t adc_tolerance = (uint32_t)(expected_adc_result * TOLERANCE_PERCENT);
 
     status = HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
     if (status != HAL_OK) {
 //        printf("Error: Failed to start DAC conversion. Status: %d\n\r", status); // Debug printf
-    	response.test_result = TEST_FAIL;
         vPortFree(command);
-        return response;
+        return TEST_FAIL;
     }
 
 	for(uint8_t i=0 ; i< command->iterations ; i++){
@@ -55,9 +49,8 @@ result_pro_t adc_testing(test_command_t* command){
 	    if (status != HAL_OK) {
 //	        printf("Error: Failed to start ADC conversion. Status: %d\n\r", status); // Debug printf
 	    	HAL_ADC_Stop(&hadc1);
-	    	response.test_result = TEST_FAIL;
 	        vPortFree(command);
-	        return response;
+	        return TEST_FAIL;
 	    }
 
 	    // waiting for the ADC conversion to complete and give a semaphore
@@ -68,9 +61,8 @@ result_pro_t adc_testing(test_command_t* command){
 		else{
 //	         printf("ADC semaphore acquire failed or timed out\n\r"); // Debug printf
 	         HAL_ADC_Stop(&hadc1);
-	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
-	         return response;
+	         return TEST_FAIL;
 		}
 
 		// Compare the result with the expected value, within a tolerance
@@ -81,9 +73,8 @@ result_pro_t adc_testing(test_command_t* command){
 		{
 //			  printf("Test failed on iteration %u- Expected Value: %u, ADC value: %lu.\n\r",i+1, expected_adc_result, adc_value); // Debug printf
 			  HAL_ADC_Stop(&hadc1);
-			  response.test_result = TEST_FAIL;
 			  vPortFree(command);
-			  return response;
+			  return TEST_FAIL;
 //		} else {
 //				// Debug printf
 //			  printf("ADC value is within tolerance for iteration %u\n\r", i+1);
@@ -93,15 +84,13 @@ result_pro_t adc_testing(test_command_t* command){
 		status = HAL_ADC_Stop(&hadc1);
 		if (status != HAL_OK) {
 //			printf("Warning: Failed to stop ADC conversion. Status: %d\n\r", status); // Debug printf
-	         response.test_result = TEST_FAIL;
 	         vPortFree(command);
-	         return response;
+	         return TEST_FAIL;
 		}
 	} // end of iterations
 
-	response.test_result = TEST_PASS;
 	vPortFree(command);
-	return response;
+	return TEST_PASS;
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)

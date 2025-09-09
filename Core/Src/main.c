@@ -71,6 +71,8 @@ DMA_HandleTypeDef hdma_i2c4_tx;
 
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
+DMA_HandleTypeDef hdma_spi1_tx;
+DMA_HandleTypeDef hdma_spi2_rx;
 
 TIM_HandleTypeDef htim7;
 
@@ -78,7 +80,6 @@ UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_uart4_rx;
-DMA_HandleTypeDef hdma_uart4_tx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
@@ -150,6 +151,16 @@ const osSemaphoreAttr_t AdcSem_attributes = {
 osSemaphoreId_t TimSemHandle;
 const osSemaphoreAttr_t TimSem_attributes = {
   .name = "TimSem"
+};
+/* Definitions for SpiTx */
+osSemaphoreId_t SpiTxHandle;
+const osSemaphoreAttr_t SpiTx_attributes = {
+  .name = "SpiTx"
+};
+/* Definitions for SpiSlaveRx */
+osSemaphoreId_t SpiSlaveRxHandle;
+const osSemaphoreAttr_t SpiSlaveRx_attributes = {
+  .name = "SpiSlaveRx"
 };
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -268,6 +279,12 @@ int main(void)
 
   /* creation of TimSem */
   TimSemHandle = osSemaphoreNew(1, 0, &TimSem_attributes);
+
+  /* creation of SpiTx */
+  SpiTxHandle = osSemaphoreNew(1, 0, &SpiTx_attributes);
+
+  /* creation of SpiSlaveRx */
+  SpiSlaveRxHandle = osSemaphoreNew(1, 0, &SpiSlaveRx_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
 
@@ -613,10 +630,10 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_ENABLE;
   hspi1.Init.CRCPolynomial = 7;
   hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
   hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
@@ -655,7 +672,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.NSS = SPI_NSS_SOFT;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_ENABLE;
   hspi2.Init.CRCPolynomial = 7;
   hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
   hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
@@ -855,6 +872,7 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream0_IRQn interrupt configuration */
@@ -863,15 +881,18 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
-  /* DMA1_Stream4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 6, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+  /* DMA1_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA1_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+  /* DMA2_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
 
 }
 
@@ -1148,33 +1169,37 @@ void perform_tests(void *argument)
 		printf("perform_tests: No test command received\n\r");
 		continue;
 	}
+	result_pro_t response;
+
 	if(cmd->bit_pattern_length > MAX_BIT_PATTERN_LENGTH || cmd->test_id == NULL || cmd->iterations<1){
-		result_pro_t response = {cmd->test_id, TEST_ERR};
+		response.test_result =TEST_ERR;
 		send_response(response);
 	}
+	response.test_id = cmd->test_id;
+
 	switch (cmd->peripheral){
 	case TIMER:
-		send_response(timer_testing(cmd));
+		response.test_result = timer_testing(cmd);
 		break;
 	case UART:
-		send_response(uart_testing(cmd));
+		response.test_result = uart_testing(cmd);
 		break;
 	case SPI:
-		send_response(spi_testing(cmd));
+		response.test_result = spi_testing(cmd);
 		break;
 	case I2C:
-		send_response(i2c_testing(cmd));
+		response.test_result = i2c_testing(cmd);
 		break;
 	case ADC_P:
-		send_response(adc_testing(cmd));
+		response.test_result = adc_testing(cmd);
 		break;
 	default:
-		result_pro_t response = {cmd->test_id, TEST_ERR};
-		send_response(response);
+		response.test_result = TEST_ERR;
         vPortFree(cmd);
         break;
 	}
     osDelay(1);
+    send_response(response);
   }
   /* USER CODE END perform_tests */
 }

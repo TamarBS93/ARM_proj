@@ -11,14 +11,15 @@
 
 #include "project_header.h"
 
-#define TIMEOUT 	2000 	// ticks (60  millis).
+#define TIMEOUT 	1000 	// ticks (60  millis).
 
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 
 extern osSemaphoreId_t SpiTxHandle;
 extern osSemaphoreId_t SpiRxHandle;
+extern osSemaphoreId_t SpiSlaveRxHandle;
 
-result_pro_t spi_testing(test_command_t*);
+Result spi_testing(test_command_t*);
 
 #endif /* SPIS_H_ */

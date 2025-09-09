@@ -16,6 +16,6 @@
 extern TIM_HandleTypeDef htim7;
 extern osSemaphoreId_t TimSemHandle;
 
-result_pro_t timer_testing(test_command_t*);
+Result timer_testing(test_command_t*);
 
 #endif /* TIMERS_H_ */
