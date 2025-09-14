@@ -1,4 +1,4 @@
-../SW/Src/spis.c:15:8:spi_testing	13
-../SW/Src/spis.c:136:6:HAL_SPI_TxCpltCallback	4
-../SW/Src/spis.c:156:6:HAL_SPI_RxCpltCallback	4
+../SW/Src/spis.c:17:8:spi_testing	13
+../SW/Src/spis.c:138:6:HAL_SPI_TxCpltCallback	4
+../SW/Src/spis.c:158:6:HAL_SPI_RxCpltCallback	4
 ../SW/Src/spis.c:178:6:HAL_SPI_TxRxCpltCallback	4

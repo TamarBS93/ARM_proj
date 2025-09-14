@@ -11,12 +11,15 @@
 #define SPI_SENDER 	    (&hspi1) // Master
 #define SPI_RECEIVER	(&hspi2) // Slave
 
+uint8_t echo_rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
+uint8_t echo_tx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 
 Result spi_testing(test_command_t* command){
 
 	static uint8_t tx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 	static uint8_t rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 	static uint8_t echo_rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
+	static uint8_t echo_tx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 
 	HAL_StatusTypeDef status;
 
@@ -32,11 +35,11 @@ Result spi_testing(test_command_t* command){
 	    printf("SPI_TEST: Iteration %u/%u -\n\r", i + 1, command->iterations);
 	    memset(rx_buffer, 0, command->bit_pattern_length);
 
-	    HAL_SPI_Abort(SPI_SENDER);
-	    HAL_SPI_Abort(SPI_RECEIVER);
+	    HAL_SPI_Abort_IT(SPI_SENDER);
+	    HAL_SPI_Abort_IT(SPI_RECEIVER);
 
 	    // 1. Prepare Slave for a Receive Operation
-	    status = HAL_SPI_Receive_IT(SPI_RECEIVER, echo_rx_buffer, command->bit_pattern_length);
+	    status = HAL_SPI_TransmitReceive_IT(SPI_RECEIVER, echo_tx_buffer,echo_rx_buffer, command->bit_pattern_length);
 	    if (status != HAL_OK) {
 	        printf("Failed to start slave receive: %d\n\r", status);
 	        vPortFree(command);
@@ -44,7 +47,7 @@ Result spi_testing(test_command_t* command){
 	    }
 
 	    // 2. Master Transmits data
-	    status = HAL_SPI_Transmit_IT(SPI_SENDER, tx_buffer, command->bit_pattern_length);
+	    status = HAL_SPI_TransmitReceive_IT(SPI_SENDER, tx_buffer,rx_buffer, command->bit_pattern_length);
 	    if (status != HAL_OK) {
 	        printf("Failed to start master transmit: %d\n\r", status);
 	        vPortFree(command);
@@ -91,7 +94,6 @@ Result spi_testing(test_command_t* command){
 		        HAL_SPI_Abort_IT(SPI_SENDER);
 		        return TEST_FAIL;
 		    }
-
 	    }
 
 	    // 6. Wait for Master's final Receive to complete
@@ -160,8 +162,6 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
     {
         xSemaphoreGiveFromISR(SpiSlaveRxHandle, &xHigherPriorityTaskWoken);
         printf("Slave Rx callback fired, starting echo\n\r");
-//    	memcpy(slave_tx_buffer, slave_rx_buffer,  SPI_RECEIVER->RxXferSize);
-
     }
     else if (hspi->Instance == SPI_SENDER->Instance)
     {
@@ -181,8 +181,9 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if (hspi->Instance == SPI_RECEIVER->Instance)
     {
-//        xSemaphoreGiveFromISR(SpiSlaveRxHandle, &xHigherPriorityTaskWoken);
-        printf("Slave RxTx callback fired\n\r");
+        xSemaphoreGiveFromISR(SpiSlaveRxHandle, &xHigherPriorityTaskWoken);
+        printf("Slave TxRx callback fired\n\r");
+//        memcpy(echo_tx_buffer,echo_rx_buffer, SPI_RECEIVER->RxXferSize);
     }
     else if (hspi->Instance == SPI_SENDER->Instance)
     {

@@ -71,8 +71,6 @@ DMA_HandleTypeDef hdma_i2c4_tx;
 
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
-DMA_HandleTypeDef hdma_spi1_tx;
-DMA_HandleTypeDef hdma_spi2_rx;
 
 TIM_HandleTypeDef htim7;
 
@@ -192,7 +190,7 @@ static struct udp_pcb *udp_pcb_handle;
 void udp_receive_init(void);
 void udp_receive_callback(void *arg, struct udp_pcb *pcb,
                           struct pbuf *p, const ip_addr_t *addr, u16_t port);
-void send_response(result_pro_t result);
+int send_response(result_pro_t result);
 uint32_t calculate_crc(uint8_t *data, size_t length);
 
 /* USER CODE END PFP */
@@ -630,7 +628,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_ENABLE;
@@ -872,7 +870,6 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
-  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream0_IRQn interrupt configuration */
@@ -881,18 +878,12 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
-  /* DMA1_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA1_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-  /* DMA2_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
 
 }
 
@@ -959,9 +950,10 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// Make sure configCHECK_FOR_STACK_OVERFLOW is set to 1 or 2 in FreeRTOSConfig.h
 
 /**
+ * // configCHECK_FOR_STACK_OVERFLOW is set to  2 in FreeRTOSConfig.h
+ *
  * @brief Hook function for FreeRTOS stack overflow detection.
  * This function is called by the FreeRTOS kernel if a stack overflow is detected.
  * It's crucial to put the system into a safe state here, as the stack is corrupted.
@@ -973,7 +965,6 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
 {
     // A stack overflow has been detected. This is a critical error.
     // The system is in an unstable state.
-    // It is generally not safe to continue execution or call complex functions.
 
     printf("\n\r!!! STACK OVERFLOW DETECTED !!!\n\r");
     printf("Task: %s\n\r", pcTaskName);
@@ -991,8 +982,6 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
 
 void udp_receive_init(void)
 {
-	//printf("udp_receive_init() called\n\r");
-
     udp_pcb_handle = udp_new();
     if (!udp_pcb_handle) {
         printf("Failed to create UDP PCB\n\r");
@@ -1007,7 +996,12 @@ void udp_receive_init(void)
     udp_recv(udp_pcb_handle, udp_receive_callback, NULL);
     printf("UDP ready, listening on port %d\n\r", LOCAL_PORT);
 }
-
+/*
+ * this function gets a received buffer then:
+ * 1. alters it to a test_command_t struct
+ * 2. sends it to execution queue.
+ *
+ * */
 void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
     if (p != NULL) {
@@ -1016,60 +1010,69 @@ void udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const 
         // Copy the sender's port
         g_server_port = port;
 
-//        // debug printf
-//        printf("Received from %s:%d -> %.*s\n\r",
-//               ipaddr_ntoa(addr), port, p->len, (char *)p->payload);
-
-        if (p->len >= sizeof(test_command_t)) {
+        if (p->len >= sizeof(test_command_t))
+        {
             test_command_t *cmd = (test_command_t *)pvPortMalloc(sizeof(test_command_t));
-            if (cmd != NULL) {
+            if (cmd != NULL)
+            {
 			   // Copy the data from the pbuf payload to the allocated memory
 			   memcpy(cmd, p->payload, sizeof(test_command_t)); // Only copy the struct size
-//				// Debug print received data
-//				printf("Received Test Command:\n\r");
-//				printf("test_id: %lu\n\r", cmd->test_id);
-//				printf("peripheral bitfield: 0x%02X\n\r", cmd->peripheral);
-//				printf("iterations: %u\n\r", cmd->iterations);
-//				printf("bit pattern length: %u\n\r", cmd->bit_pattern_length);
-//				printf("bit pattern: %s\n\r",cmd->bit_pattern);
+
+	            // Send the POINTER to the newly allocated and copied* data to the queue
+	            if (xQueueSendToBack(testsQHandle, &cmd, 1) != pdPASS) // Pass address of pointer
+	            {
+	            	result_pro_t response={NULL, TEST_ERR};
+	            	send_response(response);
+	                vPortFree(cmd); // If send fails, free the allocated memory
+	            } else {
+	                // notify if successfully sent to queue
+	                xTaskNotifyGive(performing_taskHandle);
+	            }
             }
             else{
+            	result_pro_t response={NULL, TEST_ERR};
+            	send_response(response);
                 printf("Failed to allocate memory for test_command_t!\n\r"); // Debug printf
             }
-            // Send the POINTER to the newly allocated and copied* data to the queue
-            if (xQueueSendToBack(testsQHandle, &cmd, 1) != pdPASS){ // Pass address of pointer
-                printf("Failed to send data to tests queue.\n\r"); // Debug printf
-                // If send fails, free the allocated memory immediately
-                vPortFree(cmd);
-            } else {
-                // Only notify if successfully sent to queue
-            	//printf("udp_receive_callback sent a command to the tests queue successfully\n\r");
-                xTaskNotifyGive(performing_taskHandle);
-            }
         } else {
-//            printf("Packet too short: %d bytes\n\r", p->len); // Debug printf
+        	result_pro_t response={NULL, TEST_ERR};
+        	send_response(response);
         }
         pbuf_free(p);
     }
+    else{
+    	result_pro_t response={NULL, TEST_ERR};
+    	send_response(response);
+    }
 }
 
-void send_response(result_pro_t result) {
+int send_response(result_pro_t result)
+{
     // Check if we have a valid sender address
-    if (ip_addr_isany(&g_server_addr) == 0) {
+    if (ip_addr_isany(&g_server_addr) == 0)
+    {
         // Create a new pbuf for the response data
         struct pbuf* p = pbuf_alloc(PBUF_TRANSPORT, sizeof(result_pro_t), PBUF_RAM);
-        if (p != NULL) {
+        if (p != NULL)
+        {
             // Copy the result struct into the pbuf payload
             memcpy(p->payload, &result, sizeof(result_pro_t));
 
             // Send the response to the stored address and port
-            if(udp_sendto(udp_pcb_handle, p, &g_server_addr, g_server_port) != ERR_OK){
-//            	printf("sendto server failed"); // Debug printf
+            if(udp_sendto(udp_pcb_handle, p, &g_server_addr, g_server_port) != ERR_OK)
+            {
+                pbuf_free(p);
+            	return -1;
             }
-
             // Free the pbuf
             pbuf_free(p);
         }
+        else{
+        	return -1;
+        }
+    }
+    else{
+    	return -1;
     }
 }
 
@@ -1148,8 +1151,9 @@ void udp_function(void *argument)
 
 /* USER CODE BEGIN Header_perform_tests */
 /**
-* @brief Function implementing the performing_task thread.
-* @param argument: Not used
+* @brief Function implementing the performing_task thread:
+* sorting the commands to its test (UART/SPI/etc.)
+* @param argument: Not used (using queue instead)
 * @retval None
 */
 /* USER CODE END Header_perform_tests */
@@ -1162,7 +1166,6 @@ void perform_tests(void *argument)
   for(;;)
   {
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // waiting for a notification
-	//printf("perform_tests woke up!\n\r");
 
 	if (xQueueReceive(testsQHandle, &cmd, 0) != pdPASS)
 	{
@@ -1171,7 +1174,7 @@ void perform_tests(void *argument)
 	}
 	result_pro_t response;
 
-	if(cmd->bit_pattern_length > MAX_BIT_PATTERN_LENGTH || cmd->test_id == NULL || cmd->iterations<1){
+	if(cmd->bit_pattern_length > MAX_BIT_PATTERN_LENGTH || cmd->test_id == NULL || cmd->iterations < 1){
 		response.test_result =TEST_ERR;
 		send_response(response);
 	}
