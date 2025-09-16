@@ -1,4 +1,4 @@
-../SW/Src/spis.c:17:8:spi_testing	32	static
-../SW/Src/spis.c:138:6:HAL_SPI_TxCpltCallback	24	static,ignoring_inline_asm
-../SW/Src/spis.c:158:6:HAL_SPI_RxCpltCallback	24	static,ignoring_inline_asm
-../SW/Src/spis.c:178:6:HAL_SPI_TxRxCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/spis.c:22:8:spi_testing	32	static
+../SW/Src/spis.c:134:6:HAL_SPI_TxCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/spis.c:154:6:HAL_SPI_RxCpltCallback	24	static,ignoring_inline_asm
+../SW/Src/spis.c:174:6:HAL_SPI_TxRxCpltCallback	24	static,ignoring_inline_asm

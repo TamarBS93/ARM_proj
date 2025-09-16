@@ -27,7 +27,6 @@ Result adc_testing(test_command_t* command){
     status = HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
     if (status != HAL_OK) {
 //        printf("Error: Failed to start DAC conversion. Status: %d\n\r", status); // Debug printf
-        vPortFree(command);
         return TEST_FAIL;
     }
 
@@ -49,7 +48,6 @@ Result adc_testing(test_command_t* command){
 	    if (status != HAL_OK) {
 //	        printf("Error: Failed to start ADC conversion. Status: %d\n\r", status); // Debug printf
 	    	HAL_ADC_Stop(&hadc1);
-	        vPortFree(command);
 	        return TEST_FAIL;
 	    }
 
@@ -61,7 +59,6 @@ Result adc_testing(test_command_t* command){
 		else{
 //	         printf("ADC semaphore acquire failed or timed out\n\r"); // Debug printf
 	         HAL_ADC_Stop(&hadc1);
-	         vPortFree(command);
 	         return TEST_FAIL;
 		}
 
@@ -73,7 +70,6 @@ Result adc_testing(test_command_t* command){
 		{
 //			  printf("Test failed on iteration %u- Expected Value: %u, ADC value: %lu.\n\r",i+1, expected_adc_result, adc_value); // Debug printf
 			  HAL_ADC_Stop(&hadc1);
-			  vPortFree(command);
 			  return TEST_FAIL;
 //		} else {
 //				// Debug printf
@@ -84,12 +80,10 @@ Result adc_testing(test_command_t* command){
 		status = HAL_ADC_Stop(&hadc1);
 		if (status != HAL_OK) {
 //			printf("Warning: Failed to stop ADC conversion. Status: %d\n\r", status); // Debug printf
-	         vPortFree(command);
 	         return TEST_FAIL;
 		}
 	} // end of iterations
 
-	vPortFree(command);
 	return TEST_PASS;
 }
 

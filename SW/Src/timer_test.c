@@ -1,7 +1,10 @@
 #include "timer_test.h"
 
-uint16_t tick_count = 0;
-
+/*
+ * @brief Performs a test on the TIMER using the command protocol.
+ * @param command: A pointer to the test_command_t struct.
+ * @retval result_t: The result of the test (TEST_PASS or TEST_FAIL).
+ */
 Result timer_testing(test_command_t* command){
 
 	uint16_t start_val ,end_val;
@@ -29,7 +32,6 @@ Result timer_testing(test_command_t* command){
     // Stop Timer after the test is complete
 	HAL_TIM_Base_Stop_IT(&htim7);
 
-    vPortFree(command);
     return TEST_PASS;
 }
 
