@@ -21,5 +21,7 @@ extern osSemaphoreId_t SpiRxHandle;
 extern osSemaphoreId_t SpiSlaveRxHandle;
 
 Result spi_testing(test_command_t*);
+void clear_flags(SPI_HandleTypeDef *hspi);
+void reset_test();
 
 #endif /* SPIS_H_ */

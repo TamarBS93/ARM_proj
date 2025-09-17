@@ -2,7 +2,7 @@
 
 /*
  *
- * SPI1 Master (TX DMA)        SPI2 Slave (RX DMA)
+ * SPI1 Master                 SPI2 Slave
  * PA5 SCK   (CN7)  <--------> PB10 SCK (CN10)
  * PA6 MISO	 (CN7)  ---------> PC2 MISO (CN10)
  * PB5 MOSI  (CN7)  <--------- PC3 MOSI (CN9)
@@ -11,7 +11,9 @@
 #define SPI_SENDER 	    (&hspi1) // Master
 #define SPI_RECEIVER	(&hspi2) // Slave
 
-//int g_master_flag = 0;
+#define CS_Pin          GPIO_PIN_0
+#define CS_GPIO_Port    GPIOG
+
 uint8_t echo_rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 uint8_t echo_tx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 /*
@@ -23,8 +25,6 @@ Result spi_testing(test_command_t* command){
 
 	static uint8_t tx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 	static uint8_t rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
-//	static uint8_t echo_rx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
-//	static uint8_t echo_tx_buffer[MAX_BIT_PATTERN_LENGTH] = {0};
 
 	HAL_StatusTypeDef status;
 
@@ -40,8 +40,11 @@ Result spi_testing(test_command_t* command){
 	    printf("SPI_TEST: Iteration %u/%u -\n\r", i + 1, command->iterations);
 	    memset(rx_buffer, 0, command->bit_pattern_length);
 
-	    HAL_SPI_Abort(SPI_SENDER);
-	    HAL_SPI_Abort(SPI_RECEIVER);
+	    reset_test();
+	    clear_flags(SPI_SENDER);
+	    clear_flags(SPI_RECEIVER);
+
+	    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET); // CS low → enable slave
 
 	    // 1. Prepare Slave for a Receive Operation
 	    status = HAL_SPI_TransmitReceive_DMA(SPI_RECEIVER, echo_tx_buffer, echo_rx_buffer, command->bit_pattern_length);
@@ -49,59 +52,59 @@ Result spi_testing(test_command_t* command){
 	        printf("Failed to start slave receive: %d\n\r", status);
 	        return TEST_FAIL;
 	    }
-
 	    // 2. Master Transmits data
 	    status = HAL_SPI_TransmitReceive_DMA(SPI_SENDER, tx_buffer, rx_buffer, command->bit_pattern_length);
 	    if (status != HAL_OK) {
 	        printf("Failed to start master transmit: %d\n\r", status);
-	        HAL_SPI_DMAStop(SPI_RECEIVER);
+	        reset_test();
 	        return TEST_FAIL;
 	    }
 
 	    // 3. Wait for the Master's Transmit to complete
 	    if (xSemaphoreTake(SpiTxHandle, TIMEOUT) != pdPASS) {
 	         printf("Master TX timeout\n\r");
-	         HAL_SPI_Abort(SPI_SENDER);
-	         HAL_SPI_Abort(SPI_RECEIVER);
+		     reset_test();
 		     return TEST_FAIL;
-	    }
-	    else
-	    {
-
 	    }
 	    // 4. Wait for the Slave's Receive to complete, which triggers its echo back
 	    if (xSemaphoreTake(SpiSlaveRxHandle, TIMEOUT) != pdPASS) {
 	         printf("Slave RX timeout\n\r");
-	         HAL_SPI_Abort(SPI_SENDER);
-	         HAL_SPI_Abort(SPI_RECEIVER);
+		     reset_test();
 	         return TEST_FAIL;
 	    }
-	    else
-	    {
-	    	// 5. Now, prepare Master to Receive the Echoed data
-		    status = HAL_SPI_Receive_DMA(SPI_SENDER, rx_buffer, command->bit_pattern_length);
-		    if (status != HAL_OK) {
-		        printf("Failed to start master Rx: %d\n\r", status);
-		        HAL_SPI_Abort(SPI_SENDER);
-		        HAL_SPI_Abort(SPI_RECEIVER);
-		        return TEST_FAIL;
-		    }
-		    status = HAL_SPI_Transmit_DMA(SPI_RECEIVER, echo_tx_buffer, command->bit_pattern_length);
-		    if (status != HAL_OK) {
-		        printf("Failed to start slave transmit: %d\n\r", status);
-		        HAL_SPI_Abort(SPI_RECEIVER);
-		        HAL_SPI_Abort(SPI_SENDER);
-		        return TEST_FAIL;
-		    }
-	    }
+	    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);   // CS high → disable slave
+
+	    clear_flags(SPI_RECEIVER);
+	    osDelay(1); // tiny delay 1ms
+
+		HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET); // CS low → enable slave
+		SCB_CleanDCache_by_Addr((uint32_t*)echo_tx_buffer, command->bit_pattern_length);
+
+		// 5. Now, prepare Master to Receive the Echoed data
+		status = HAL_SPI_Receive_DMA(SPI_SENDER, rx_buffer, command->bit_pattern_length);
+		if (status != HAL_OK) {
+			printf("Failed to start master Rx: %d\n\r", status);
+	        reset_test();
+			return TEST_FAIL;
+		}
+
+		status = HAL_SPI_Transmit_DMA(SPI_RECEIVER, echo_tx_buffer, command->bit_pattern_length);
+		if (status != HAL_OK) {
+			printf("Failed to start slave transmit: %d\n\r", status);
+	        reset_test();
+			return TEST_FAIL;
+		}
+
+		HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);   // CS high → disable slave
 
 	    // 6. Wait for Master's final Receive to complete
 	    if (xSemaphoreTake(SpiRxHandle, TIMEOUT) != pdPASS) {
 	         printf("Master RX timeout\n\r");
-	         HAL_SPI_Abort(SPI_SENDER);
-	         HAL_SPI_Abort(SPI_RECEIVER);
+	         reset_test();
 	         return TEST_FAIL;
 	    }
+
+    	SCB_InvalidateDCache_by_Addr((uint32_t*)echo_rx_buffer, command->bit_pattern_length);
 
 	    // 7. Compare Sent vs. Received data
 	    if (command->bit_pattern_length > 100) {
@@ -136,12 +139,11 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if (hspi->Instance == SPI_SENDER->Instance)
     {
-        xSemaphoreGiveFromISR(SpiTxHandle, &xHigherPriorityTaskWoken);
-        printf("Master Tx callback fired\n\r");
+//        printf("Master Tx callback fired\n\r");
     }
     else if(hspi->Instance == SPI_RECEIVER->Instance)
     {
-        printf("Slave Tx callback fired\n\r");
+//        printf("Slave Tx callback fired\n\r");
     }
     else
     {
@@ -157,11 +159,11 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
     if (hspi->Instance == SPI_RECEIVER->Instance)
     {
         xSemaphoreGiveFromISR(SpiSlaveRxHandle, &xHigherPriorityTaskWoken);
-        printf("Slave Rx callback fired, starting echo\n\r");
+//        printf("Slave Rx callback fired, starting echo\n\r");
     }
     else if (hspi->Instance == SPI_SENDER->Instance)
     {
-        printf("Master Rx callback fired\n\r");
+//        printf("Master Rx callback fired\n\r");
         xSemaphoreGiveFromISR(SpiRxHandle, &xHigherPriorityTaskWoken);
     }
     else
@@ -178,20 +180,13 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     if (hspi->Instance == SPI_RECEIVER->Instance)
     {
         xSemaphoreGiveFromISR(SpiSlaveRxHandle, &xHigherPriorityTaskWoken);
-        printf("Slave TxRx callback fired\n\r");
+//        printf("Slave TxRx callback fired\n\r");
         memcpy(echo_tx_buffer,echo_rx_buffer, SPI_RECEIVER->RxXferSize);
     }
     else if (hspi->Instance == SPI_SENDER->Instance)
     {
-        printf("Master TxRx callback fired\n\r");
-//        if (!g_master_flag){
-//        	g_master_flag++;
-        	xSemaphoreGiveFromISR(SpiTxHandle, &xHigherPriorityTaskWoken);
-//        }
-//        else{
-//        	g_master_flag --;
-//        	xSemaphoreGiveFromISR(SpiRxHandle, &xHigherPriorityTaskWoken);
-//        }
+//        printf("Master TxRx callback fired\n\r");
+        xSemaphoreGiveFromISR(SpiTxHandle, &xHigherPriorityTaskWoken);
     }
     else
     {
@@ -200,4 +195,31 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
+void clear_flags(SPI_HandleTypeDef *hspi)
+{
+    HAL_SPI_Abort(hspi);
+    __HAL_SPI_CLEAR_OVRFLAG(hspi);
+    HAL_SPIEx_FlushRxFifo(hspi);
+}
+void reset_test()
+{
+	HAL_SPI_Abort(SPI_SENDER);
+	HAL_SPI_Abort(SPI_RECEIVER);
+	xQueueReset(SpiTxHandle);
+	xQueueReset(SpiRxHandle);
+	xQueueReset(SpiSlaveRxHandle);
+}
+
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+  if (hspi->Instance == SPI_RECEIVER->Instance)
+  {
+    if (__HAL_SPI_GET_FLAG(hspi, SPI_FLAG_OVR))
+    {
+      __HAL_SPI_CLEAR_OVRFLAG(hspi);
+      HAL_SPIEx_FlushRxFifo(hspi);
+    }
+  }
+}
 
