@@ -2,14 +2,14 @@
 
 /*
  *
- * SPI1 Master                 SPI2 Slave
- * PA5 SCK   (CN7)  <--------> PB10 SCK (CN10)
- * PA6 MISO	 (CN7)  ---------> PC2 MISO (CN10)
- * PB5 MOSI  (CN7)  <--------- PC3 MOSI (CN9)
+ * SPI1 Master                 SPI4 Slave
+ * PA5 SCK   (CN7)  <--------> PE2 SCK (CN9)
+ * PA6 MISO	 (CN7)  ---------> PE5 MISO (CN9)
+ * PB5 MOSI  (CN7)  <--------- PE6 MOSI (CN9)
  *
  */
 #define SPI_SENDER 	    (&hspi1) // Master
-#define SPI_RECEIVER	(&hspi2) // Slave
+#define SPI_RECEIVER	(&hspi4) // Slave
 
 #define CS_Pin          GPIO_PIN_0
 #define CS_GPIO_Port    GPIOG
@@ -95,14 +95,14 @@ Result spi_testing(test_command_t* command){
 			return TEST_FAIL;
 		}
 
-		HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);   // CS high → disable slave
-
 	    // 6. Wait for Master's final Receive to complete
 	    if (xSemaphoreTake(SpiRxHandle, TIMEOUT) != pdPASS) {
 	         printf("Master RX timeout\n\r");
 	         reset_test();
 	         return TEST_FAIL;
 	    }
+
+		HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);   // CS high → disable slave
 
     	SCB_InvalidateDCache_by_Addr((uint32_t*)echo_rx_buffer, command->bit_pattern_length);
 
@@ -133,24 +133,24 @@ Result spi_testing(test_command_t* command){
     return TEST_PASS;
 }
 
-// Tx Complete Callback
-void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    if (hspi->Instance == SPI_SENDER->Instance)
-    {
-//        printf("Master Tx callback fired\n\r");
-    }
-    else if(hspi->Instance == SPI_RECEIVER->Instance)
-    {
-//        printf("Slave Tx callback fired\n\r");
-    }
-    else
-    {
-    	UNUSED(hspi);
-    }
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
+//// Tx Complete Callback
+//void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+//{
+//    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+//    if (hspi->Instance == SPI_SENDER->Instance)
+//    {
+////        printf("Master Tx callback fired\n\r");
+//    }
+//    else if(hspi->Instance == SPI_RECEIVER->Instance)
+//    {
+////        printf("Slave Tx callback fired\n\r");
+//    }
+//    else
+//    {
+//    	UNUSED(hspi);
+//    }
+//    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+//}
 
 // Rx Complete Callback
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
@@ -205,9 +205,9 @@ void reset_test()
 {
 	HAL_SPI_Abort(SPI_SENDER);
 	HAL_SPI_Abort(SPI_RECEIVER);
-	xQueueReset(SpiTxHandle);
-	xQueueReset(SpiRxHandle);
-	xQueueReset(SpiSlaveRxHandle);
+    while (xSemaphoreTake(SpiTxHandle, 0) == pdTRUE) {}
+    while (xSemaphoreTake(SpiRxHandle, 0) == pdTRUE) {}
+    while (xSemaphoreTake(SpiSlaveRxHandle, 0) == pdTRUE) {}
 }
 
 

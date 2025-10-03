@@ -14,7 +14,7 @@
 #define TIMEOUT 	1000 	// ticks (60  millis).
 
 extern SPI_HandleTypeDef hspi1;
-extern SPI_HandleTypeDef hspi2;
+extern SPI_HandleTypeDef hspi4;
 
 extern osSemaphoreId_t SpiTxHandle;
 extern osSemaphoreId_t SpiRxHandle;

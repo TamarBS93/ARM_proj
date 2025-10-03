@@ -1,9 +1,8 @@
 ../Drivers/CMSIS/Include/core_cm7.h:2464:22:SCB_InvalidateDCache_by_Addr	2
 ../Drivers/CMSIS/Include/core_cm7.h:2491:22:SCB_CleanDCache_by_Addr	2
 ../SW/Src/spis.c:24:8:spi_testing	13
-../SW/Src/spis.c:137:6:HAL_SPI_TxCpltCallback	2
 ../SW/Src/spis.c:156:6:HAL_SPI_RxCpltCallback	4
 ../SW/Src/spis.c:176:6:HAL_SPI_TxRxCpltCallback	4
 ../SW/Src/spis.c:198:6:clear_flags	1
-../SW/Src/spis.c:204:6:reset_test	1
+../SW/Src/spis.c:204:6:reset_test	4
 ../SW/Src/spis.c:214:6:HAL_SPI_ErrorCallback	3
