@@ -13,8 +13,21 @@
 
 #define TIMEOUT 	1000 	// ticks (60  millis).
 
-extern SPI_HandleTypeDef hspi1;
-extern SPI_HandleTypeDef hspi4;
+#define RETRY_DELAY_MS 5
+#define RETRY_COUNT 5
+/*
+ * SPI mapping in your project:
+ * SPI_SENDER  -> hspi1 (Master)
+ * SPI_RECEIVER-> hspi4 (Slave)
+ */
+#define SPI_SENDER     (&hspi1)
+#define SPI_RECEIVER   (&hspi4)
+
+#define CS_Pin          GPIO_PIN_0
+#define CS_GPIO_Port    GPIOG
+//
+//extern uint8_t spi_tx_buffer[MAX_BIT_PATTERN_LENGTH];
+//extern uint8_t spi_rx_buffer[MAX_BIT_PATTERN_LENGTH];
 
 extern osSemaphoreId_t SpiTxHandle;
 extern osSemaphoreId_t SpiRxHandle;

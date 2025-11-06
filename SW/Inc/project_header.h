@@ -10,8 +10,8 @@
 #include <stdint.h>
 
 
-//#define SERVER_IP "127.0.0.1"
-//#define g_server_port 8080
+#define SERVER_IP "127.0.0.1"
+#define SERVER_PORT 8080
 #define CLIENT_IP "192.168.1.168"
 #define CLIENT_PORT 5005
 

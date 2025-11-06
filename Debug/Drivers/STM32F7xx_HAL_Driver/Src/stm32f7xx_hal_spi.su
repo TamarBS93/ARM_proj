@@ -3,8 +3,8 @@
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:536:13:HAL_SPI_MspInit	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:552:13:HAL_SPI_MspDeInit	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:824:19:HAL_SPI_Transmit	40	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1013:19:HAL_SPI_Receive	48	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1256:19:HAL_SPI_TransmitReceive	72	static
+../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1013:19:HAL_SPI_Receive	40	static
+../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1256:19:HAL_SPI_TransmitReceive	48	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1604:19:HAL_SPI_Transmit_IT	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1686:19:HAL_SPI_Receive_IT	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:1790:19:HAL_SPI_TransmitReceive_IT	32	static
@@ -28,8 +28,8 @@
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3009:22:HAL_SPI_GetState	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3021:10:HAL_SPI_GetError	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3046:13:SPI_DMATransmitCplt	32	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3103:13:SPI_DMAReceiveCplt	48	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3220:13:SPI_DMATransmitReceiveCplt	48	static
+../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3103:13:SPI_DMAReceiveCplt	24	static
+../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3220:13:SPI_DMATransmitReceiveCplt	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3321:13:SPI_DMAHalfTransmitCplt	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3339:13:SPI_DMAHalfReceiveCplt	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3357:13:SPI_DMAHalfTransmitReceiveCplt	24	static
@@ -38,14 +38,10 @@
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3420:13:SPI_DMATxAbortCallback	40	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3487:13:SPI_DMARxAbortCallback	40	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3553:13:SPI_2linesRxISR_8BIT	16	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3604:13:SPI_2linesRxISR_8BITCRC	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3638:13:SPI_2linesTxISR_8BIT	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3685:13:SPI_2linesRxISR_16BIT	16	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3719:13:SPI_2linesRxISR_16BITCRC	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3741:13:SPI_2linesTxISR_16BIT	16	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3779:13:SPI_RxISR_8BITCRC	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3806:13:SPI_RxISR_8BIT	16	static
-../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3840:13:SPI_RxISR_16BITCRC	24	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3862:13:SPI_RxISR_16BIT	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3895:13:SPI_TxISR_8BIT	16	static
 ../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c:3920:13:SPI_TxISR_16BIT	16	static
